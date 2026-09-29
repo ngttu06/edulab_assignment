@@ -1,0 +1,24 @@
+:root {
+    --ink: #14213d;
+    --muted: #6c7890;
+    --primary: #3867d6;
+    --navy: #15284b;
+    --cream: #f6f8fc;
+}
+body { color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; overflow-wrap: anywhere; }
+.forum-body { white-space: pre-wrap; }
+.lesson-content { max-width: 75ch; line-height: 1.7; }
+.lesson-content img { max-width: 100%; height: auto; }
+.edulab-nav { background: var(--navy); }
+.edulab-nav .navbar-brand span { color: #a8c7ff; font-weight: 400; }
+.login-page { background: linear-gradient(135deg, #13264a 0%, #3465ba 55%, #66a6d9 100%); }
+.brand-mark { display:inline-flex; width:56px; height:56px; align-items:center; justify-content:center; border-radius:18px; background:#fff; color:var(--primary); font-size:30px; font-weight:800; box-shadow:0 12px 35px rgba(0,0,0,.18); }
+.card { border-radius: 16px; }
+.hero-panel { color: #fff; border-radius: 20px; background: linear-gradient(120deg, #203c77 0%, #3b72d4 68%, #6ab1dc 100%); box-shadow: 0 16px 30px rgba(35, 67, 125, .16); }
+.progress-ring { display:inline-flex; width:132px; height:132px; border:11px solid rgba(255,255,255,.25); border-top-color:#ffd166; border-right-color:#ffd166; border-radius:50%; flex-direction:column; align-items:center; justify-content:center; }
+.progress-ring strong { font-size:26px; }.progress-ring span { font-size:11px; opacity:.8; }
+.stat-card { display:flex; gap:15px; align-items:center; padding:20px; background:#fff; border-radius:16px; box-shadow:0 5px 18px rgba(25,46,86,.06); }
+.stat-icon { width:43px; height:43px; border-radius:13px; display:inline-flex; align-items:center; justify-content:center; font-size:21px; font-weight:700; }.stat-icon.blue { background:#e8efff;color:#3867d6; }.stat-icon.green { background:#e5f7ef;color:#1f9d68; }.stat-icon.orange { background:#fff1df;color:#d98516; }
+.lesson-item { display:flex; align-items:center; gap:14px; padding:17px 0; border-top:1px solid #edf0f5; }.lesson-item:first-of-type { border-top:0; }.lesson-number { width:35px; height:35px; border-radius:10px; background:#e8efff; color:#3867d6; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }.lesson-number.muted { color:#8a94a6;background:#f0f2f6; }.lesson-item.active { background:#f8faff; margin-inline:-16px; padding-inline:16px; border-radius:12px; }
+.quiz-callout { background:linear-gradient(135deg,#eef9f4,#f5fbfa); border:1px solid #d9f0e5; }
+.form-control { border-radius:10px; padding:.7rem .85rem; }.btn { border-radius:9px; }

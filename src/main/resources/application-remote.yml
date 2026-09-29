@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: ${EDULAB_DB_URL}
+    username: ${EDULAB_DB_USERNAME}
+    password: ${EDULAB_DB_PASSWORD}
+
+edulab:
+  security:
+    jwt:
+      secret: ${EDULAB_JWT_SECRET}

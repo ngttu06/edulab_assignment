@@ -1,0 +1,22 @@
+# Java / Maven
+/target/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local secrets and uploads
+.env
+.env.*
+!.env.example
+storage/
+
+# Local tool state
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.tools/
+
+# Logs
+*.log

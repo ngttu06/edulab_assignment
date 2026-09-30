@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.khtn8.identity.dto.*;
 import vn.edu.khtn8.identity.security.AuthenticatedUser;
@@ -24,8 +25,16 @@ public class AuthController {
         this.limiter=limiter;
     }
 
-    @GetMapping("/login") public String loginPage() { return "auth/login"; }
-    @GetMapping("/register") public String registerPage() { return "auth/register"; }
+    @GetMapping("/login") public String loginPage(Model model) {
+        model.addAttribute("pageTitle", "Đăng nhập · EduLab");
+        model.addAttribute("contentPage", "/WEB-INF/jsp/auth/login.jsp");
+        return "layout/auth";
+    }
+    @GetMapping("/register") public String registerPage(Model model) {
+        model.addAttribute("pageTitle", "Đăng ký · EduLab");
+        model.addAttribute("contentPage", "/WEB-INF/jsp/auth/register.jsp");
+        return "layout/auth";
+    }
 
     @GetMapping("/api/v1/auth/csrf") @ResponseBody
     public java.util.Map<String, String> csrf(org.springframework.security.web.csrf.CsrfToken token) {

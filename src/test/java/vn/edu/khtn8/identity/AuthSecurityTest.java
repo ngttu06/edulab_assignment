@@ -37,12 +37,34 @@ class AuthSecurityTest {
     @MockBean JwtService jwt;
     @MockBean vn.edu.khtn8.identity.security.LoginRateLimiter limiter;
 
+    @Test void loginPageUsesSharedAuthenticationLayout() throws Exception {
+        mvc.perform(get("/login"))
+                .andExpect(status().isOk()).andExpect(view().name("layout/auth"))
+                .andExpect(model().attribute("pageTitle", "Đăng nhập · EduLab"))
+                .andExpect(model().attribute("contentPage", "/WEB-INF/jsp/auth/login.jsp"));
+    }
+    @Test void registerPageUsesSharedAuthenticationLayout() throws Exception {
+        mvc.perform(get("/register"))
+                .andExpect(status().isOk()).andExpect(view().name("layout/auth"))
+                .andExpect(model().attribute("pageTitle", "Đăng ký · EduLab"))
+                .andExpect(model().attribute("contentPage", "/WEB-INF/jsp/auth/register.jsp"));
+    }
+    @Test void sharedAuthenticationJspIncludesAreNotBlocked() throws Exception {
+        // MockMvc has no JSP servlet: 404 means the include passed the security filter.
+        for (String fragment : new String[]{"layout/header.jsp", "layout/footer.jsp", "auth/login.jsp", "auth/register.jsp"}) {
+            mvc.perform(get("/WEB-INF/jsp/" + fragment).with(request -> {
+                        request.setDispatcherType(DispatcherType.INCLUDE);
+                        return request;
+                    }))
+                    .andExpect(status().isNotFound());
+        }
+    }
     @Test void unauthenticatedApiIs401() throws Exception {
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
     }
     @Test void internalJspForwardIsNotRedirectedToLogin() throws Exception {
         // MockMvc has no JSP servlet: 404 means the forward passed the security filter.
-        mvc.perform(get("/WEB-INF/jsp/auth/login.jsp").with(request -> {
+        mvc.perform(get("/WEB-INF/jsp/layout/auth.jsp").with(request -> {
                     request.setDispatcherType(DispatcherType.FORWARD);
                     return request;
                 }))

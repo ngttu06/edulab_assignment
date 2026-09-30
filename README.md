@@ -190,10 +190,29 @@ node "$PROJECT_ROOT/scripts/browser-smoke.cjs"
 
 Ảnh chụp: homepage desktop/mobile, bài học, gia đình, diễn đàn, báo cáo học sinh/phụ huynh và admin trong `$PROJECT_ROOT/.tools/screenshots`. Các luồng có ảnh/report cá nhân thật không được công khai hoặc commit.
 
+Kiểm tra riêng header/footer dùng chung trên đăng nhập, đăng ký và trang chủ (6 kích thước, validation, CSRF, đăng nhập/đăng xuất, focus menu và thông báo lỗi):
+
+```bash
+EDULAB_SMOKE_URL='http://127.0.0.1:8083/edulab' \
+EDULAB_PLAYWRIGHT_PATH="$PROJECT_ROOT/.tools/browser/node_modules/playwright" \
+EDULAB_CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+EDULAB_SCREENSHOT_DIR="$PROJECT_ROOT/.tools/screenshots/auth" \
+node "$PROJECT_ROOT/scripts/browser-auth.cjs"
+```
+
+Mặc định script dùng `hocsinh` để thử lỗi đăng ký trùng tên và đăng nhập thật, không tạo tài khoản mới. Đăng xuất thu hồi phiên của tài khoản demo; không chạy đồng thời với test dùng cùng tài khoản. Để kiểm tra đăng ký thành công, có thể đặt `EDULAB_AUTH_REGISTER_USERNAME=auth_layout_test_<suffix>` với tên duy nhất. Chế độ này tạo tài khoản PARENT thử nghiệm trên DB local và không tự xóa; cần dọn tài khoản cùng refresh session của nó sau khi chạy.
+
+Script kiểm tra POST thiếu CSRF bị từ chối với 403, cookie xác thực được xóa sau đăng xuất và `/api/v1/auth/me` trở lại 401. Khi đăng xuất ngay trên `/login`, nó chờ response 204 và form đăng xuất biến mất trong DOM mới, không chỉ chờ URL vốn đã là `/login`.
+
+Giới hạn có sẵn: `pattern="[A-Za-z0-9._-]{3,80}"` của tên đăng nhập được giữ nguyên. Chromium hiện dùng regex `v` cho HTML pattern và bỏ qua regex này do dấu `-` chưa escape; vì vậy smoke kiểm tra native validation qua required/email/password, không tuyên bố native username validation đạt. Backend vẫn kiểm tra ký tự và độ dài tên đăng nhập qua `RegisterRequest`.
+
+Xác nhận riêng layout xác thực ngày **30/09/2026**: `clean verify -Dtest=!MysqlIntegrationTest` đạt **73 test, 0 failure/error/skip**, gồm workflow MySQL local; không chạy Docker/Testcontainers. Cả chế độ mặc định và đăng ký PARENT mới đều đạt browser regression ở **1440/1024/768/640/390/320 px**, không tràn ngang, không trùng document/header/footer/ID, không lỗi JavaScript/CSP hoặc request ra ngoài. Đã kiểm tra đăng ký → đăng nhập → đăng xuất, lỗi đăng nhập/đăng ký/đăng xuất, CSRF, xóa cookie và API 401 sau đăng xuất. Tài khoản `auth_layout_test_20260930_1128` và refresh session thử nghiệm đã được dọn khỏi `127.0.0.1:3307/edulab_test`. WAR preview riêng và ảnh ở `.tools/screenshots/auth` được Git ignore, không đưa vào commit. Không xác nhận pixel-perfect với ảnh tham chiếu gốc vì ảnh đó không có trong phiên này.
+
 Kiểm tra cú pháp/whitespace bổ sung:
 
 ```bash
 node --check "$PROJECT_ROOT/scripts/browser-smoke.cjs"
+node --check "$PROJECT_ROOT/scripts/browser-auth.cjs"
 find "$PROJECT_ROOT/src/main/resources/static/js" -name '*.js' -exec node --check {} \;
 bash -n "$PROJECT_ROOT/run-local.sh" "$PROJECT_ROOT/run-remote.sh"
 git -C "$PROJECT_ROOT" diff --check

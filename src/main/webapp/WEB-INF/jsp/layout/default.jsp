@@ -16,12 +16,7 @@
 </head>
 <body>
 <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
-<header class="app-header">
-    <div class="header-brand"><button id="menuToggle" class="icon-button menu-toggle" type="button" aria-label="Mở menu" aria-controls="sideNav" aria-expanded="false"><ui:icon name="menu"/></button><a class="brand" href="${pageContext.request.contextPath}/"><span class="logo-symbol" aria-hidden="true">E<span>·</span></span><span>EduLab</span></a></div>
-    <form class="header-search" action="${pageContext.request.contextPath}/courses" method="get" role="search"><label class="visually-hidden" for="headerQuery">Tìm khóa học</label><input id="headerQuery" name="q" type="search" maxlength="100" placeholder="Tìm khóa học, môn học..."><button type="submit" class="icon-button" aria-label="Tìm kiếm"><ui:icon name="search"/></button></form>
-    <nav class="header-shortcuts" aria-label="Truy cập nhanh"><a data-nav href="${pageContext.request.contextPath}/" aria-label="Trang chủ" title="Trang chủ"><ui:icon name="home"/></a><a data-nav href="${pageContext.request.contextPath}/courses" aria-label="Khóa học" title="Khóa học"><ui:icon name="cap"/></a><a data-nav href="${pageContext.request.contextPath}/lessons" aria-label="Bài học" title="Bài học"><ui:icon name="book"/></a><a data-nav href="${pageContext.request.contextPath}/quizzes" aria-label="Luyện tập" title="Luyện tập"><ui:icon name="quiz"/></a><a data-nav href="${pageContext.request.contextPath}/forum" aria-label="Diễn đàn" title="Diễn đàn"><ui:icon name="chat"/></a></nav>
-    <div class="header-account"><c:choose><c:when test="${not empty pageContext.request.userPrincipal}"><a class="account-link" href="${pageContext.request.contextPath}/dashboard"><ui:icon name="user"/><span>Góc của tôi</span></a><form id="logoutForm" method="post" action="${pageContext.request.contextPath}/api/v1/auth/logout"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"><button class="btn btn-outline-primary btn-sm" type="submit">Đăng xuất</button></form></c:when><c:otherwise><a class="register-link" href="${pageContext.request.contextPath}/register">Đăng ký</a><a class="btn btn-primary btn-sm" href="${pageContext.request.contextPath}/login">Đăng nhập</a></c:otherwise></c:choose></div>
-</header>
+<jsp:include page="/WEB-INF/jsp/layout/header.jsp"/>
 <div class="app-shell ${discovery ? 'discovery-shell' : 'workspace-shell'}">
     <aside id="sideNav" class="sidebar" aria-label="Điều hướng chính">
         <div class="sidebar-mobile-title"><span class="brand">EduLab</span><button id="menuClose" type="button" class="icon-button" aria-label="Đóng menu"><ui:icon name="close"/></button></div>
@@ -47,6 +42,6 @@
     <main id="mainContent" class="main-content" tabindex="-1"><div id="globalNotice" class="alert alert-danger d-none" role="alert"></div><div class="${discovery ? 'discovery-content' : 'workspace-content'}"><jsp:include page="${contentPage}"/></div></main>
     <c:if test="${discovery}"><jsp:include page="/WEB-INF/jsp/layout/utilities.jsp"/></c:if>
 </div>
-<footer class="site-footer"><div class="footer-grid"><div><a class="brand" href="${pageContext.request.contextPath}/"><span class="logo-symbol" aria-hidden="true">E<span>·</span></span>EduLab</a><p class="mt-3">Học chủ động, vững tương lai.<br>Một hành trình nhỏ mỗi ngày,<br>một thế giới kiến thức rộng mở.</p></div><div><h2>Khám phá</h2><a href="${pageContext.request.contextPath}/courses">Khóa học đa môn</a><a href="${pageContext.request.contextPath}/lessons">Thư viện bài học</a><a href="${pageContext.request.contextPath}/quizzes">Luyện tập &amp; kiểm tra</a></div><div><h2>Cùng tiến bộ</h2><a href="${pageContext.request.contextPath}/roadmap">Lộ trình học tập</a><a href="${pageContext.request.contextPath}/forum">Diễn đàn hỏi đáp</a><a href="${pageContext.request.contextPath}/dashboard">Không gian cá nhân</a></div><div><h2>Học tập an toàn</h2><p>Không chia sẻ dữ liệu cá nhân trong câu hỏi và bài đăng.</p><p>AI hỗ trợ học tập, không thay thế giáo viên. Hãy kiểm chứng câu trả lời.</p></div></div><div class="footer-bottom">EduLab · Nền tảng học tập trực tuyến<span>Hiểu kiến thức. Mở lối tư duy.</span></div></footer>
+<jsp:include page="/WEB-INF/jsp/layout/footer.jsp"/>
 </body>
 </html>

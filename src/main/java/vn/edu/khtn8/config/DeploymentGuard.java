@@ -24,5 +24,20 @@ public class DeploymentGuard {
             throw new IllegalStateException("Invalid upload size limits");
         if (properties.getAi().getDailyRequestLimit() < 1 || properties.getAi().getDailyRequestLimit() > 100)
             throw new IllegalStateException("AI daily limit must be between 1 and 100");
+        var ai = properties.getAi();
+        if (!java.util.Set.of("gatecheap", "stub").contains(ai.getProvider()) || (!localOnly && ai.getProvider().equals("stub")))
+            throw new IllegalStateException("AI provider must be gatecheap; stub requires local-only profile");
+        if (ai.isEnabled() && ai.getProvider().equals("gatecheap") && ai.getApiKey().isBlank())
+            throw new IllegalStateException("EDULAB_AI_API_KEY is required when real AI is enabled");
+        if (ai.getConnectTimeoutSeconds() < 1 || ai.getConnectTimeoutSeconds() > 30 || ai.getReadTimeoutSeconds() < 1 || ai.getReadTimeoutSeconds() > 120
+                || ai.getMaxOutputTokens() < 100 || ai.getMaxOutputTokens() > 4000 || ai.getModel().isBlank())
+            throw new IllegalStateException("Invalid AI timeout, model or output limit");
+        if (environment.acceptsProfiles(Profiles.of("remote", "prod"))) {
+            String url = environment.getProperty("spring.datasource.url", "");
+            if (!url.matches(".*[?&]sslMode=VERIFY_IDENTITY(?:&.*)?"))
+                throw new IllegalStateException("Remote MySQL requires sslMode=VERIFY_IDENTITY");
+            if (environment.getProperty("spring.flyway.enabled", Boolean.class, false))
+                throw new IllegalStateException("Run remote migrations separately, not at application startup");
+        }
     }
 }

@@ -1,4 +1,6 @@
 spring:
+  flyway:
+    enabled: true
   datasource:
     # Public-key retrieval is only for the loopback, non-TLS development database.
     url: ${EDULAB_DB_URL:jdbc:mysql://localhost:3306/edulab_assignment?useUnicode=true&characterEncoding=utf8&sslMode=DISABLED&allowPublicKeyRetrieval=true&serverTimezone=UTC}

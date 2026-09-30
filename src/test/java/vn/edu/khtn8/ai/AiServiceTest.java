@@ -1,9 +1,7 @@
 package vn.edu.khtn8.ai;
 
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.server.ResponseStatusException;
 import vn.edu.khtn8.common.config.AppProperties;
@@ -19,21 +17,43 @@ class AiServiceTest {
     @Test void disabledDoesNotCallProviderOrReadContext() {
         var provider = mock(AiProvider.class);
         var lessons = mock(LessonService.class);
-        var jdbc = mock(JdbcTemplate.class);
-        var service = new AiService(new AppProperties(),provider,lessons,jdbc);
+        var quota = mock(AiQuotaService.class);
+        var service = new AiService(new AppProperties(),provider,lessons,quota,mock(vn.edu.khtn8.content.service.LearningPathService.class));
         var error = assertThrows(ResponseStatusException.class, () -> service.ask(user,2,"Question"));
         assertEquals(503,error.getStatusCode().value());
-        verifyNoInteractions(provider,lessons,jdbc);
+        verifyNoInteractions(provider,lessons,quota);
     }
     @Test void quotaExceededDoesNotCallProvider() {
         var properties = new AppProperties(); properties.getAi().setEnabled(true);
         var provider = mock(AiProvider.class);
         var lessons = mock(LessonService.class);
-        var jdbc = mock(JdbcTemplate.class);
+        var quota = mock(AiQuotaService.class);
         when(lessons.detail(1,2)).thenReturn(new LessonDetail(2L,"Topic","Title","Summary",15,"Goal","<p>Content</p>","NOT_STARTED",0));
-        when(jdbc.queryForObject("SELECT COUNT(*) FROM ai_requests WHERE user_id=? AND created_at>=DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 1 DAY)",Integer.class,1L)).thenReturn(20);
-        var error = assertThrows(ResponseStatusException.class, () -> new AiService(properties,provider,lessons,jdbc).ask(user,2,"Question"));
+        when(provider.providerName()).thenReturn("gatecheap");
+        when(quota.reserve(1,"gatecheap")).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS));
+        var error = assertThrows(ResponseStatusException.class, () -> new AiService(properties,provider,lessons,quota,mock(vn.edu.khtn8.content.service.LearningPathService.class)).ask(user,2,"Question"));
         assertEquals(429,error.getStatusCode().value());
-        verifyNoInteractions(provider);
+        verify(provider,never()).answer(any());
+    }
+
+    @Test void realAnswerHasPublishedSourceAndNoSampleLabel() {
+        var properties = new AppProperties(); properties.getAi().setEnabled(true);
+        var provider = mock(AiProvider.class); var lessons = mock(LessonService.class); var quota = mock(AiQuotaService.class);
+        when(provider.providerName()).thenReturn("gatecheap"); when(quota.reserve(1,"gatecheap")).thenReturn(7L);
+        when(lessons.detail(1,2)).thenReturn(new LessonDetail(2L,"Topic","Title","Summary",15,"Goal","<p>Content</p>","NOT_STARTED",0));
+        when(provider.answer(any())).thenReturn(new AiProvider.AiAnswer("Answer",new String[]{"Untrusted source"},true));
+        var result = new AiService(properties,provider,lessons,quota,mock(vn.edu.khtn8.content.service.LearningPathService.class)).ask(user,2,"Question");
+        assertFalse(result.sample()); assertArrayEquals(new String[]{"Title"},result.sourceLabels());
+        verify(provider).answer(new AiProvider.AiQuestion("Question","Môn học: ; khối lớp: 0; bài: Title\nContent","HINT")); verify(quota).finish(7,true);
+    }
+
+    @Test void failureIsRecorded() {
+        var properties = new AppProperties(); properties.getAi().setEnabled(true);
+        var provider = mock(AiProvider.class); var lessons = mock(LessonService.class); var quota = mock(AiQuotaService.class);
+        when(provider.providerName()).thenReturn("gatecheap"); when(quota.reserve(1,"gatecheap")).thenReturn(7L);
+        when(lessons.detail(1,2)).thenReturn(new LessonDetail(2L,"Topic","Title","Summary",15,"Goal","Content","NOT_STARTED",0));
+        when(provider.answer(any())).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+        assertThrows(ResponseStatusException.class, () -> new AiService(properties,provider,lessons,quota,mock(vn.edu.khtn8.content.service.LearningPathService.class)).ask(user,2,"Question"));
+        verify(quota).finish(7,false);
     }
 }

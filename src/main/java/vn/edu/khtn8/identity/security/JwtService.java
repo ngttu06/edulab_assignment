@@ -7,7 +7,6 @@ import io.jsonwebtoken.security.Keys;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-import java.util.List;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 import vn.edu.khtn8.identity.config.JwtProperties;

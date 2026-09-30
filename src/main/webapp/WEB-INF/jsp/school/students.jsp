@@ -1,5 +1,8 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <a href="${pageContext.request.contextPath}/teacher/classes">← Các lớp</a><h1 class="h3 mt-3">Học sinh trong lớp</h1>
 <ul class="list-group"><c:forEach var="student" items="${students}"><li class="list-group-item"><a href="${pageContext.request.contextPath}/school/students/${student.id}"><c:out value="${student.full_name}"/></a></li></c:forEach></ul>
 <c:if test="${empty students}"><p>Chưa có học sinh đang theo học.</p></c:if>
+<section class="card mt-4"><div class="card-body"><h2 class="h5">Giao quiz cho lớp</h2><p class="small text-muted">Hạn hoàn thành dùng để theo dõi nộp đúng hạn; không thay đổi thời gian hay số lượt của quiz. Kết quả trước thời điểm giao bài không tính hoàn thành bài giao mới.</p><p id="assignmentNotice" role="status"></p><form id="assignmentForm" data-id="${classId}"><label for="assignedQuiz">Quiz đã xuất bản</label><select id="assignedQuiz" class="form-select mb-3"><c:forEach var="quiz" items="${quizzes}"><option value="${quiz.id()}"><c:out value="${quiz.title()}"/></option></c:forEach></select><label for="assignmentDue">Hạn hoàn thành (giờ trên thiết bị)</label><input id="assignmentDue" type="datetime-local" class="form-control mb-3" required><button class="btn btn-primary">Giao bài</button></form></div></section>
+<h2 class="h5 mt-4">Bài đã giao</h2><ul class="list-group"><c:forEach var="assignment" items="${assignments}"><li class="list-group-item"><strong><c:out value="${assignment.title}"/></strong><p class="small mb-0">Hoàn thành đúng hạn: ${assignment.completed_count}/${assignment.student_count} · Hạn: <c:out value="${assignment.due_at}"/> UTC</p></li></c:forEach></ul>
+<script src="${pageContext.request.contextPath}/js/assignments.js" defer></script>

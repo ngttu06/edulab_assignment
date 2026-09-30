@@ -39,9 +39,30 @@ public class AppProperties {
     public static class Ai {
         private boolean enabled;
         private int dailyRequestLimit = 20;
+        private String provider = "gatecheap";
+        private String baseUrl = "https://gatecheap.vn/v1";
+        private String apiKey = "";
+        private String model = "gpt-6-astra";
+        private int connectTimeoutSeconds = 5;
+        private int readTimeoutSeconds = 45;
+        private int maxOutputTokens = 1000;
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public int getDailyRequestLimit() { return dailyRequestLimit; }
         public void setDailyRequestLimit(int dailyRequestLimit) { this.dailyRequestLimit = dailyRequestLimit; }
+        public String getProvider() { return provider; }
+        public void setProvider(String value) { provider = value; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String value) { baseUrl = value; }
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String value) { apiKey = value; }
+        public String getModel() { return model; }
+        public void setModel(String value) { model = value; }
+        public int getConnectTimeoutSeconds() { return connectTimeoutSeconds; }
+        public void setConnectTimeoutSeconds(int value) { connectTimeoutSeconds = value; }
+        public int getReadTimeoutSeconds() { return readTimeoutSeconds; }
+        public void setReadTimeoutSeconds(int value) { readTimeoutSeconds = value; }
+        public int getMaxOutputTokens() { return maxOutputTokens; }
+        public void setMaxOutputTokens(int value) { maxOutputTokens = value; }
     }
 }

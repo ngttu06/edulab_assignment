@@ -1,39 +1,52 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
+<c:set var="discovery" value="${contentPage == '/WEB-INF/jsp/home.jsp' or contentPage == '/WEB-INF/jsp/catalog/list.jsp'}"/>
 <!doctype html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="app-context" content="${pageContext.request.contextPath}">
-    <title><c:out value="${pageTitle}" default="EduLab KHTN 8" /></title>
-    <script src="${pageContext.request.contextPath}/js/app.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title><c:out value="${pageTitle}" default="EduLab · Học chủ động"/></title>
+    <link href="${pageContext.request.contextPath}/css/vendor/bootstrap.min.css" rel="stylesheet">
+    <link href="${pageContext.request.contextPath}/css/fonts.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/edulab.css" rel="stylesheet">
+    <script src="${pageContext.request.contextPath}/js/app.js" defer></script>
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark edulab-nav">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="${pageContext.request.contextPath}/dashboard">EduLab <span>KHTN 8</span></a>
-        <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#mainNav"><span class="navbar-toggler-icon"></span></button>
-        <div class="collapse navbar-collapse" id="mainNav">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/dashboard">Tổng quan</a></li>
-                <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/lessons">Bài học</a></li>
-                <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/quizzes">Quiz</a></li>
-                <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/forum">Diễn đàn</a></li>
-                <c:if test="${pageContext.request.isUserInRole('TEACHER') or pageContext.request.isUserInRole('ADMIN')}"><li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/teacher/classes">Lớp học</a></li></c:if>
-                <c:if test="${pageContext.request.isUserInRole('STUDENT') or pageContext.request.isUserInRole('PARENT')}"><li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/family">Gia đình</a></li></c:if>
-            </ul>
-            <form id="logoutForm" method="post" action="${pageContext.request.contextPath}/api/v1/auth/logout">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-                <button class="btn btn-outline-light btn-sm" type="submit">Đăng xuất</button>
-            </form>
-        </div>
-    </div>
-</nav>
-<main class="container py-4"><div id="globalNotice" class="alert alert-danger d-none" role="alert"></div><jsp:include page="${contentPage}" /></main>
-<footer class="container py-4 text-muted small border-top">EduLab KHTN 8 · Học để hiểu, khám phá để tiến bộ.</footer>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<body>
+<a class="skip-link" href="#mainContent">Đến nội dung chính</a>
+<header class="app-header">
+    <div class="header-brand"><button id="menuToggle" class="icon-button menu-toggle" type="button" aria-label="Mở menu" aria-controls="sideNav" aria-expanded="false"><ui:icon name="menu"/></button><a class="brand" href="${pageContext.request.contextPath}/"><span class="logo-symbol" aria-hidden="true">E<span>·</span></span><span>EduLab</span></a></div>
+    <form class="header-search" action="${pageContext.request.contextPath}/courses" method="get" role="search"><label class="visually-hidden" for="headerQuery">Tìm khóa học</label><input id="headerQuery" name="q" type="search" maxlength="100" placeholder="Tìm khóa học, môn học..."><button type="submit" class="icon-button" aria-label="Tìm kiếm"><ui:icon name="search"/></button></form>
+    <nav class="header-shortcuts" aria-label="Truy cập nhanh"><a data-nav href="${pageContext.request.contextPath}/" aria-label="Trang chủ" title="Trang chủ"><ui:icon name="home"/></a><a data-nav href="${pageContext.request.contextPath}/courses" aria-label="Khóa học" title="Khóa học"><ui:icon name="cap"/></a><a data-nav href="${pageContext.request.contextPath}/lessons" aria-label="Bài học" title="Bài học"><ui:icon name="book"/></a><a data-nav href="${pageContext.request.contextPath}/quizzes" aria-label="Luyện tập" title="Luyện tập"><ui:icon name="quiz"/></a><a data-nav href="${pageContext.request.contextPath}/forum" aria-label="Diễn đàn" title="Diễn đàn"><ui:icon name="chat"/></a></nav>
+    <div class="header-account"><c:choose><c:when test="${not empty pageContext.request.userPrincipal}"><a class="account-link" href="${pageContext.request.contextPath}/dashboard"><ui:icon name="user"/><span>Góc của tôi</span></a><form id="logoutForm" method="post" action="${pageContext.request.contextPath}/api/v1/auth/logout"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"><button class="btn btn-outline-primary btn-sm" type="submit">Đăng xuất</button></form></c:when><c:otherwise><a class="register-link" href="${pageContext.request.contextPath}/register">Đăng ký</a><a class="btn btn-primary btn-sm" href="${pageContext.request.contextPath}/login">Đăng nhập</a></c:otherwise></c:choose></div>
+</header>
+<div class="app-shell ${discovery ? 'discovery-shell' : 'workspace-shell'}">
+    <aside id="sideNav" class="sidebar" aria-label="Điều hướng chính">
+        <div class="sidebar-mobile-title"><span class="brand">EduLab</span><button id="menuClose" type="button" class="icon-button" aria-label="Đóng menu"><ui:icon name="close"/></button></div>
+        <a class="sidebar-account" data-nav href="${pageContext.request.contextPath}${empty pageContext.request.userPrincipal ? '/login' : '/dashboard'}"><span class="nav-icon"><ui:icon name="user"/></span>${empty pageContext.request.userPrincipal ? 'Đăng nhập để bắt đầu' : 'Góc học tập của tôi'}</a>
+        <nav class="side-links" aria-label="Học tập">
+            <a data-nav href="${pageContext.request.contextPath}/"><span class="nav-icon blue"><ui:icon name="home"/></span>Trang chủ</a>
+            <a data-nav href="${pageContext.request.contextPath}/courses"><span class="nav-icon coral"><ui:icon name="cap"/></span>Khóa học</a>
+            <a data-nav href="${pageContext.request.contextPath}/lessons"><span class="nav-icon blue"><ui:icon name="book"/></span>Thư viện bài học</a>
+            <a data-nav href="${pageContext.request.contextPath}/quizzes"><span class="nav-icon purple"><ui:icon name="quiz"/></span>Luyện tập &amp; kiểm tra</a>
+            <a data-nav href="${pageContext.request.contextPath}/roadmap"><span class="nav-icon orange"><ui:icon name="route"/></span>Lộ trình học</a>
+            <a data-nav href="${pageContext.request.contextPath}/forum"><span class="nav-icon green"><ui:icon name="chat"/></span>Diễn đàn hỏi đáp</a>
+        </nav>
+        <div class="sidebar-section"><h2>Không gian của bạn</h2><nav class="side-links" aria-label="Không gian cá nhân">
+            <a data-nav href="${pageContext.request.contextPath}/dashboard"><span class="nav-icon"><ui:icon name="chart"/></span>Tổng quan học tập</a>
+            <c:if test="${pageContext.request.isUserInRole('TEACHER') or pageContext.request.isUserInRole('ADMIN')}"><a data-nav href="${pageContext.request.contextPath}/teacher/classes"><span class="nav-icon"><ui:icon name="users"/></span>Quản lý lớp học</a></c:if>
+            <c:if test="${pageContext.request.isUserInRole('STUDENT') or pageContext.request.isUserInRole('PARENT')}"><a data-nav href="${pageContext.request.contextPath}/family"><span class="nav-icon"><ui:icon name="users"/></span>Kết nối gia đình</a></c:if>
+            <c:if test="${pageContext.request.isUserInRole('ADMIN')}"><a data-nav href="${pageContext.request.contextPath}/admin"><span class="nav-icon"><ui:icon name="settings"/></span>Quản trị hệ thống</a></c:if>
+        </nav></div>
+        <div class="sidebar-note"><ui:icon name="spark"/><strong>Mỗi ngày một bước tiến</strong><p>Chọn một bài học nhỏ.<br>Khám phá một điều mới.</p><a href="${pageContext.request.contextPath}/courses">Khám phá ngay <span aria-hidden="true">→</span></a></div>
+        <p class="sidebar-signature">EduLab · Học chủ động</p>
+    </aside>
+    <button id="menuBackdrop" class="menu-backdrop" type="button" aria-label="Đóng menu" hidden></button>
+    <main id="mainContent" class="main-content" tabindex="-1"><div id="globalNotice" class="alert alert-danger d-none" role="alert"></div><div class="${discovery ? 'discovery-content' : 'workspace-content'}"><jsp:include page="${contentPage}"/></div></main>
+    <c:if test="${discovery}"><jsp:include page="/WEB-INF/jsp/layout/utilities.jsp"/></c:if>
+</div>
+<footer class="site-footer"><div class="footer-grid"><div><a class="brand" href="${pageContext.request.contextPath}/"><span class="logo-symbol" aria-hidden="true">E<span>·</span></span>EduLab</a><p class="mt-3">Học chủ động, vững tương lai.<br>Một hành trình nhỏ mỗi ngày,<br>một thế giới kiến thức rộng mở.</p></div><div><h2>Khám phá</h2><a href="${pageContext.request.contextPath}/courses">Khóa học đa môn</a><a href="${pageContext.request.contextPath}/lessons">Thư viện bài học</a><a href="${pageContext.request.contextPath}/quizzes">Luyện tập &amp; kiểm tra</a></div><div><h2>Cùng tiến bộ</h2><a href="${pageContext.request.contextPath}/roadmap">Lộ trình học tập</a><a href="${pageContext.request.contextPath}/forum">Diễn đàn hỏi đáp</a><a href="${pageContext.request.contextPath}/dashboard">Không gian cá nhân</a></div><div><h2>Học tập an toàn</h2><p>Không chia sẻ dữ liệu cá nhân trong câu hỏi và bài đăng.</p><p>AI hỗ trợ học tập, không thay thế giáo viên. Hãy kiểm chứng câu trả lời.</p></div></div><div class="footer-bottom">EduLab · Nền tảng học tập trực tuyến<span>Hiểu kiến thức. Mở lối tư duy.</span></div></footer>
 </body>
 </html>

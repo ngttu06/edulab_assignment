@@ -11,6 +11,8 @@ spring:
     username: ${EDULAB_DB_USERNAME:edulab}
     password: ${EDULAB_DB_PASSWORD:edulab_local_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: "SET time_zone = '+00:00'"
   jpa:
     open-in-view: false
     hibernate:
@@ -21,7 +23,7 @@ spring:
         jdbc:
           time_zone: UTC
   flyway:
-    enabled: true
+    enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: false
   servlet:
@@ -54,6 +56,13 @@ edulab:
     dev-scan-bypass: ${EDULAB_DEV_SCAN_BYPASS:false}
   ai:
     enabled: ${EDULAB_AI_ENABLED:false}
+    provider: ${EDULAB_AI_PROVIDER:gatecheap}
+    base-url: ${EDULAB_AI_BASE_URL:https://gatecheap.vn/v1}
+    api-key: ${EDULAB_AI_API_KEY:}
+    model: ${EDULAB_AI_MODEL:gpt-6-astra}
+    connect-timeout-seconds: 5
+    read-timeout-seconds: 45
+    max-output-tokens: ${EDULAB_AI_MAX_OUTPUT_TOKENS:1000}
     daily-request-limit: ${EDULAB_AI_DAILY_REQUEST_LIMIT:20}
 
 logging:

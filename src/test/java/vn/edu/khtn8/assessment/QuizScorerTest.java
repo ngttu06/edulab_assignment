@@ -26,4 +26,10 @@ class QuizScorerTest {
         assertNull(view.score());
         assertTrue(view.questions().stream().allMatch(q -> q.explanation() == null && q.options().stream().allMatch(o -> o.correct() == null)));
     }
+    @Test void testAnswersStayHiddenUntilReleaseDate() {
+        var attempt=new Attempt(1,2,"Test","GRADED",Instant.now(),questions,Map.of(),BigDecimal.TEN,BigDecimal.TEN,false,"TEST",Instant.now().plusSeconds(3600));
+        var view=QuizService.view(attempt);
+        assertEquals(BigDecimal.TEN,view.score());
+        assertTrue(view.questions().stream().allMatch(q->q.explanation()==null&&q.options().stream().allMatch(o->o.correct()==null)));
+    }
 }

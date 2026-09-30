@@ -1,9 +1,11 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <a href="${pageContext.request.contextPath}/quizzes">← Danh sách quiz</a>
 <h1 class="h3 mt-3"><c:out value="${attempt.title()}"/></h1>
 <p>Hạn nộp: <time id="deadline" datetime="${attempt.deadline()}"><c:out value="${attempt.deadline()}"/></time></p>
+<c:if test="${attempt.status() == 'IN_PROGRESS'}"><p>Thời gian còn lại: <strong id="quizTimer" aria-live="off"></strong>. Câu trả lời tự lưu khi chọn; đồng hồ server quyết định hạn nộp.</p></c:if>
 <c:if test="${attempt.status() == 'GRADED'}"><p class="alert alert-info">Điểm: <c:out value="${attempt.score()}"/>/10 <c:if test="${attempt.expired()}"> — Nộp sau khi hết giờ.</c:if></p></c:if>
+<c:if test="${attempt.status() == 'GRADED' and not empty attempt.questions() and attempt.questions().get(0).explanation() == null}"><p class="text-muted small">Đáp án và giải thích sẽ hiển thị theo lịch công bố của bài kiểm tra.</p></c:if>
 <p id="quizNotice" role="alert"></p>
 <form id="quizForm" data-id="${attempt.id()}" data-status="${attempt.status()}">
 <c:forEach var="question" items="${attempt.questions()}" varStatus="index">

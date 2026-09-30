@@ -12,12 +12,14 @@ public class LessonService {
     private final LessonRepository lessons;
     public LessonService(LessonRepository lessons) { this.lessons = lessons; }
     public List<LessonSummary> list(long studentId) { return lessons.findPublishedForStudent(studentId); }
+    public List<LessonSummary> list(long studentId,CatalogFilter filter) { return lessons.findPublishedForStudent(studentId,filter); }
     public LessonDetail detail(long studentId, long lessonId) {
         LessonDetail lesson = lessons.findPublishedDetail(lessonId, studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy bài học."));
-        String safeHtml = org.jsoup.Jsoup.clean(lesson.contentHtml(), org.jsoup.safety.Safelist.basic());
+        String safeHtml = org.jsoup.Jsoup.clean(lesson.contentHtml(), org.jsoup.safety.Safelist.basic().addTags("h2","h3","h4"));
         return new LessonDetail(lesson.id(), lesson.topicName(), lesson.title(), lesson.summary(),
-                lesson.durationMinutes(), lesson.objectives(), safeHtml, lesson.progressStatus(), lesson.completionPercent());
+                lesson.durationMinutes(), lesson.objectives(), safeHtml, lesson.progressStatus(), lesson.completionPercent(),
+                lesson.courseId(),lesson.courseTitle(),lesson.subjectName(),lesson.gradeLevel());
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('STUDENT')")
     @org.springframework.transaction.annotation.Transactional

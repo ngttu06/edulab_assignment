@@ -1,10 +1,10 @@
 package vn.edu.khtn8.ai;
 
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
-@Profile("!ai-real")
+@ConditionalOnProperty(name = "edulab.ai.provider", havingValue = "stub")
 public class StubAiProvider implements AiProvider {
     @Override
     public AiAnswer answer(AiQuestion question) {

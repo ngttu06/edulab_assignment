@@ -5,7 +5,8 @@
         event.preventDefault();
         const form = event.currentTarget, button = form.querySelector('button'); button.disabled = true;
         try {
-            const result = await window.edulab.api('/api/v1/forum/threads', {method: 'POST', body: {categoryId: Number(form.dataset.category), title: value('threadTitle'), body: value('threadBody')}});
+            const result = await window.edulab.api('/api/v1/forum/threads', {method: 'POST', body: {categoryId: Number(form.dataset.category), title: value('threadTitle'), body: value('threadBody'),lessonId:Number(value('threadLesson'))||null,askAi:document.getElementById('threadAi').checked}});
+            if(result.aiUnavailable) window.alert('Câu hỏi đã đăng thành công. AI chưa sẵn sàng; hãy đợi cộng đồng hoặc giáo viên trả lời.');
             window.location.assign(window.edulab.context + '/forum/threads/' + result.id);
         } catch (error) { notice.textContent = error.message; button.disabled = false; }
     });

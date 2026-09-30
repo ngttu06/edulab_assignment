@@ -37,4 +37,12 @@ class QuizServiceTest {
         assertEquals(BigDecimal.TEN,service.submit(2,9,Map.of()).score());
         verify(repository, never()).grade(anyLong(),anyMap(),any(),anyBoolean());
     }
+    @Test void latePayloadCannotReplaceSavedAnswers() {
+        var question=new Question(1,"Q","Why",BigDecimal.ONE,List.of(new Option(11,"A",true),new Option(12,"B",false)));
+        var attempt=new Attempt(9,2,"Quiz","IN_PROGRESS",Instant.now().minusSeconds(10),List.of(question),Map.of(1L,12L),null,BigDecimal.TEN,false);
+        when(repository.find(9,2,true)).thenReturn(Optional.of(attempt));
+        when(repository.find(9,2,false)).thenReturn(Optional.of(new Attempt(9,2,"Quiz","GRADED",attempt.deadline(),List.of(question),attempt.answers(),BigDecimal.ZERO,BigDecimal.TEN,true)));
+        service.submit(2,9,Map.of(1L,11L));
+        verify(repository).grade(9,Map.of(1L,12L),new BigDecimal("0.00"),true);
+    }
 }

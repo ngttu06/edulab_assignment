@@ -12,7 +12,9 @@ import vn.edu.khtn8.identity.security.AuthenticatedUser;
 @Controller
 public class SchoolController {
     private final SchoolService school;
-    public SchoolController(SchoolService school) { this.school = school; }
+    private final AssignmentService assignments;
+    private final vn.edu.khtn8.assessment.QuizService quizzes;
+    public SchoolController(SchoolService school,AssignmentService assignments,vn.edu.khtn8.assessment.QuizService quizzes) { this.school = school; this.assignments=assignments;this.quizzes=quizzes; }
     public record CodeRequest(@NotBlank @Pattern(regexp = "[a-f0-9]{32}") String code) { }
     public record MemberRequest(@Positive long userId) { }
     public record ClassRequest(@Positive long yearId, @NotBlank @Size(max = 80) String name) { }
@@ -29,11 +31,17 @@ public class SchoolController {
     @GetMapping("/teacher/classes/{id}")
     public String students(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, Model model) {
         model.addAttribute("students", school.students(user, id));
+        model.addAttribute("classId",id);
+        model.addAttribute("assignments",assignments.forClass(user,id));
+        model.addAttribute("quizzes",quizzes.list());
         return page(model, "school/students", "Học sinh trong lớp");
     }
     @GetMapping("/school/students/{id}")
     public String report(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, Model model) {
         model.addAttribute("report", school.report(user, id));
+        model.addAttribute("assignments",assignments.forStudent(user,id));
+        model.addAttribute("feedback",assignments.feedback(user,id));
+        model.addAttribute("studentId",id);
         return page(model, "school/report", "Kết quả học tập");
     }
     @GetMapping("/family")

@@ -23,13 +23,13 @@ public class QuizRepository {
 
     public List<Quiz> list() {
         return jdbc.query("""
-                SELECT q.id, q.title, q.duration_minutes, q.max_attempts,
+                SELECT q.id, q.title, q.duration_minutes, q.max_attempts,q.mode,q.reveal_after,
                   (SELECT COUNT(*) FROM quiz_items i JOIN questions x ON x.id=i.question_id WHERE i.quiz_id=q.id AND x.active=TRUE) question_count
                 FROM quizzes q WHERE q.published=TRUE
                   AND (q.lesson_id IS NULL OR EXISTS (SELECT 1 FROM lessons l WHERE l.id=q.lesson_id AND l.status='PUBLISHED'))
                 ORDER BY q.id
                 """, (rs, n) -> new Quiz(rs.getLong("id"), rs.getString("title"), rs.getInt("duration_minutes"),
-                rs.getInt("max_attempts"), rs.getInt("question_count")));
+                rs.getInt("max_attempts"), rs.getInt("question_count"),rs.getString("mode"),rs.getTimestamp("reveal_after")==null?null:rs.getTimestamp("reveal_after").toInstant()));
     }
 
     public void lockStudent(long studentId) {
@@ -59,11 +59,12 @@ public class QuizRepository {
         GeneratedKeyHolder key = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             var statement = connection.prepareStatement("""
-                    INSERT INTO quiz_attempts(quiz_id,student_id,attempt_number,title_snapshot,questions_snapshot,deadline_at,max_score)
-                    VALUES(?,?,?,?,?,?,10)
+                    INSERT INTO quiz_attempts(quiz_id,student_id,attempt_number,title_snapshot,questions_snapshot,deadline_at,max_score,mode_snapshot,reveal_after_snapshot)
+                    VALUES(?,?,?,?,?,?,10,?,?)
                     """, Statement.RETURN_GENERATED_KEYS);
             statement.setLong(1, quiz.id()); statement.setLong(2, studentId); statement.setInt(3, number);
             statement.setString(4, quiz.title()); statement.setString(5, snapshot); statement.setTimestamp(6, Timestamp.from(deadline));
+            statement.setString(7,quiz.mode());statement.setTimestamp(8,quiz.revealAfter()==null?null:Timestamp.from(quiz.revealAfter()));
             return statement;
         }, key);
         return java.util.Objects.requireNonNull(key.getKey()).longValue();
@@ -76,13 +77,18 @@ public class QuizRepository {
             return new Attempt(rs.getLong("id"), rs.getLong("student_id"), rs.getString("title_snapshot"), rs.getString("status"),
                     rs.getTimestamp("deadline_at").toInstant(), decode(snapshot, new TypeReference<List<Question>>() { }),
                     rs.getString("answers_json") == null ? Map.of() : decode(rs.getString("answers_json"), new TypeReference<Map<Long, Long>>() { }),
-                    rs.getBigDecimal("score"), rs.getBigDecimal("max_score"), rs.getBoolean("expired"));
+                    rs.getBigDecimal("score"), rs.getBigDecimal("max_score"), rs.getBoolean("expired"),rs.getString("mode_snapshot"),
+                    rs.getTimestamp("reveal_after_snapshot")==null?null:rs.getTimestamp("reveal_after_snapshot").toInstant());
         }, id, studentId).stream().findFirst();
     }
 
     public void grade(long id, Map<Long, Long> answers, BigDecimal score, boolean expired) {
         jdbc.update("UPDATE quiz_attempts SET status='GRADED',answers_json=?,score=?,expired=?,submitted_at=CURRENT_TIMESTAMP(6) WHERE id=? AND status='IN_PROGRESS'",
                 encode(answers), score, expired, id);
+    }
+
+    public void save(long id, Map<Long,Long> answers) {
+        jdbc.update("UPDATE quiz_attempts SET answers_json=? WHERE id=? AND status='IN_PROGRESS'",encode(answers),id);
     }
 
     private String encode(Object value) {

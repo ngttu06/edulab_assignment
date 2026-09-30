@@ -1,139 +1,313 @@
 # EduLab KHTN 8
 
-Website học Khoa học tự nhiên lớp 8: Java 21, Spring Boot 3.3, Tomcat 10.1, JSP/Bootstrap, MySQL 8 và Flyway. Đóng gói WAR.
+Website học tập EduLab, khởi đầu với Khoa học tự nhiên lớp 8 và đã có danh mục đa môn, dùng **Java 21, Spring Boot 3.5.16, Tomcat 10.1, JSP/JSTL, Bootstrap, MySQL 8 và Flyway**, đóng gói WAR. Giao diện tiếng Việt lấy cảm hứng từ bố cục Mapstudy; giữ thương hiệu EduLab, không đưa ảnh giáo viên, quảng cáo hoặc mã Next.js của Mapstudy vào ứng dụng.
 
-## Chức năng đã có trong source
+Đây là **MVP học tập, chưa phải bản production-ready**. Không dùng dữ liệu cá nhân thật của học sinh để kiểm thử.
 
-- Đăng ký STUDENT/PARENT; đăng nhập JWT qua cookie HttpOnly; bốn vai trò ADMIN/TEACHER/STUDENT/PARENT. Logout thu hồi access token của tài khoản trên mọi thiết bị qua `auth_version`.
-- CSRF cho mọi thao tác thay đổi dữ liệu, kể cả login/register; client lấy token từ `/api/v1/auth/csrf`. JWT không trả trong JSON và không lưu trong browser storage.
-- Bài học đã xuất bản, nội dung HTML đã lọc; lộ trình là danh sách theo thứ tự chủ đề; tiến độ riêng của học sinh. Dashboard dùng dữ liệu database.
-- Quiz: tạo/tiếp tục lượt làm; snapshot câu hỏi/đáp án; giới hạn lượt; chấm thang 10 trên server; kết quả của chính học sinh. Không trả đáp án/explanation trước nộp. Nộp khi đã hết giờ nhận 0; nộp lại trả kết quả đã lưu.
-- Giáo viên xem lớp được phân công và kết quả học sinh; admin tạo lớp trong năm học có sẵn, ghi danh và phân công giáo viên.
-- Mã liên kết phụ huynh 128-bit, lưu SHA-256, dùng một lần, hạn 15 phút. Nhập mã hợp lệ cấp quyền ngay; học sinh/phụ huynh có thể thu hồi. Không cho phụ huynh xem học sinh chưa liên kết.
-- Diễn đàn theo chuyên mục công khai/lớp, phân trang 20 mục; tạo thảo luận/trả lời; giáo viên/admin khóa, mở, ẩn thảo luận theo phạm vi được phép.
-- Upload tối đa 3 tệp/trả lời, JPG/PNG/WebP ≤5 MB hoặc PDF ≤10 MB; đối chiếu extension/MIME/signature, SHA-256, tên lưu ngẫu nhiên ngoài webroot, hạn mức 100 MB/tài khoản. Download yêu cầu quyền và trạng thái CLEAN, luôn tải như attachment.
-- AI **chỉ là stub mẫu**, mặc định tắt; bật bằng `EDULAB_AI_ENABLED=true`. Chỉ lấy context bài đã xuất bản, giới hạn 20 yêu cầu/24 giờ; lưu metadata hạn mức, không lưu câu hỏi hoặc gửi dữ liệu ra dịch vụ ngoài.
+## Chức năng hiện có
 
-## Trạng thái kiểm chứng
+- **Danh mục khóa học:** trang chủ và `/courses` dùng môn học, khối lớp, số bài, thời lượng và tiến độ từ database; tìm kiếm và lọc theo môn/khối/khóa. Chi tiết khóa học hiển thị chương trình, trạng thái và bài tiên quyết. Không dựng giá bán, đánh giá, thống kê hoặc giáo viên giả.
+- **Tài khoản và phân quyền:** ADMIN, TEACHER, STUDENT, PARENT; đăng ký học sinh/phụ huynh; admin tạo tài khoản và bật/tắt tài khoản. JWT access token 15 phút trong cookie HttpOnly; refresh token ngẫu nhiên, lưu hash SHA-256, thời hạn mặc định 14 ngày và xoay vòng khi dùng. Phát hiện dùng lại refresh token sẽ thu hồi token family liên quan và vô hiệu access token hiện tại của tài khoản. Logout thu hồi mọi phiên của tài khoản, không chỉ thiết bị hiện tại.
+- **Bảo vệ request:** CSRF cho thao tác thay đổi dữ liệu, kể cả login/register/refresh; lấy token qua `/api/v1/auth/csrf`. Token đăng nhập không trả trong JSON hoặc lưu trong browser storage. Có giới hạn đăng nhập trong bộ nhớ của từng instance.
+- **Bài học và lộ trình:** bài đã xuất bản, HTML được lọc, mục tiêu học tập, tiến độ riêng và dashboard lấy dữ liệu thật. Bài tiên quyết có thể yêu cầu hoàn thành và đạt điểm quiz tối thiểu; kiểm tra quyền mở bài ở server. Admin tạo và xuất bản bài học, câu hỏi trắc nghiệm, quiz.
+- **Quiz:** PRACTICE và TEST; snapshot câu hỏi/đáp án khi bắt đầu, giới hạn lượt, tiếp tục bài đang làm, tự lưu và khôi phục câu trả lời. Server chấm điểm có trọng số trên thang 10. Khi hết giờ, chỉ chấm câu trả lời đã lưu; không nhận đáp án mới từ request nộp muộn. Nộp lại trả kết quả đã lưu. PRACTICE công bố đáp án sau chấm; TEST còn phải chờ lịch công bố. Có tác vụ hoàn tất bài hết giờ.
+- **Lớp học:** giáo viên xem lớp được phân công, giao quiz đã xuất bản với hạn nộp, xem kết quả và nhận xét học sinh. Học sinh và phụ huynh đã liên kết xem bài được giao và nhận xét. Bài được tính hoàn thành khi có lượt chấm nộp trong khoảng từ lúc giao đến hạn nộp; kết quả trước lúc giao không được tính. Admin quản lý lớp, ghi danh và phân công giáo viên.
+- **Gia đình:** mã liên kết ngẫu nhiên 128-bit, lưu hash, dùng một lần, hết hạn sau 15 phút. Học sinh/phụ huynh có thể thu hồi liên kết; kiểm tra phạm vi truy cập báo cáo ở server.
+- **Diễn đàn:** chuyên mục chung/theo lớp, thảo luận và trả lời, phân trang, khóa/mở/ẩn theo quyền; đính kèm tối đa ba tệp mỗi trả lời.
+- **Upload:** JPG/PNG/WebP tối đa 5 MB, PDF tối đa 10 MB, hạn mức 100 MB/tài khoản. Kiểm tra extension/MIME/signature, hash SHA-256, tên lưu ngẫu nhiên ngoài webroot. Download yêu cầu quyền và trạng thái CLEAN, trả dạng attachment. Mặc định tệp bị cách ly; xem giới hạn scanner bên dưới.
+- **Trợ giúp AI:** có adapter GateCheap gọi HTTPS `/chat/completions`, lấy ngữ cảnh từ bài đã xuất bản và kiểm tra prerequisite. Mặc định tắt. Hạn mức mặc định 20 yêu cầu/24 giờ, kể cả yêu cầu thất bại; chặn AI khi học sinh đang làm TEST còn thời gian. Có stub chỉ dành cho local. Nội dung trả lời được ghi rõ cần giáo viên kiểm tra.
 
-Đã kiểm chứng local ngày **30/09/2026** trên macOS với JDK 21, Maven 3.9.9 và MySQL 8.4.11:
+## Trạng thái kiểm chứng — 30/09/2026
 
-- `mvn clean verify`: **BUILD SUCCESS**, 40 test được phát hiện, **37 đạt, 3 bỏ qua**, không có failure/error. Ba test MySQL Testcontainers tự bỏ qua do máy không có Docker; chưa xác nhận bộ test này.
-- Chạy WAR bằng embedded Tomcat; Flyway V1–V8 và Hibernate schema validation thành công trên database local mới.
-- HTTP smoke test đạt: trang login/register, CSS/JS, đăng nhập cả bốn vai trò, dashboard, bài học, danh sách quiz, diễn đàn, gia đình, lớp học/báo cáo, logout, kiểm tra 401/403 và CSRF.
-- Có test hồi quy cho JSP forward: forward nội bộ không còn redirect lặp về login, trong khi request trực tiếp vẫn yêu cầu đăng nhập.
+Kiểm tra giao diện mới trên macOS, JDK 21, Maven 3.9.9, MySQL 8.4.11 và **WAR chạy embedded Tomcat tại `127.0.0.1:8083/edulab`**. Deployment Tomcat ngoài cổng 8082 của lần xác nhận trước không bị ghi đè:
 
-Chưa kiểm thử giao diện bằng trình duyệt tự động hoặc toàn bộ luồng nghiệp vụ end-to-end. Không có migration nào được chạy trên database remote. Đây không phải xác nhận sẵn sàng production.
+| Hạng mục | Kết quả |
+|---|---|
+| Build WAR + unit/security/local-MySQL tests | **65 test đạt, 0 failure, 0 error, 0 skip**; chủ động loại `MysqlIntegrationTest` dùng Docker/Testcontainers |
+| Database dùng để xác nhận | Chỉ `127.0.0.1:3307/edulab_test`; Flyway xác nhận đủ **12 migration** |
+| WAR giao diện mới | `/Users/ngttu/Workspace/project_asm_prj/target/edulab-khtn8.war`, context `/edulab`, connector `127.0.0.1:8083` |
+| Browser smoke bằng Playwright/Chrome | Đạt: desktop/mobile, bốn vai trò, roadmap, quiz autosave/reload/submit, liên kết gia đình, diễn đàn, giao bài, nhận xét, báo cáo học sinh/phụ huynh, admin, refresh và kiểm tra 401/403 |
+| Rendering và lỗi trình duyệt | Smoke nghiệp vụ không có JavaScript page error; homepage mobile 390 px không tràn ngang; ảnh nằm trong `/Users/ngttu/Workspace/project_asm_prj/.tools/screenshots/theme-flows` |
+| Theme regression Playwright/Chrome | Đạt ở 1440/1024/768/390/320 px: catalog/filter/rỗng/404, drawer bàn phím, assets/font nội bộ; rendering bốn vai trò ở 1440/768/390 px; không lỗi JavaScript/CSP hoặc tràn ngang trong các trang kiểm tra |
+| Auto-update Git | **13 test đạt** bằng Node.js với repo tạm/bare remote local: commit/push, watch, từ chối phân kỳ/staged changes/secret, retry push và khóa đồng thời; không chứng minh quyền truy cập GitHub |
+| Log ứng dụng sau deploy/smoke | Không có application ERROR/SEVERE hoặc lỗi render JSP; còn cảnh báo cấu hình AuthenticationProvider của Spring Security |
 
-## Chạy local
+Đã sửa lỗi `/roadmap` HTTP 500 do MySQL trả predicate dạng số nhưng JSP cần Boolean. Mapper dùng chung chuyển `unlocked`, `completed`, `overdue` thành Java Boolean; có unit test và hồi quy MySQL cho các trạng thái mở/khóa, chờ/hoàn thành/quá hạn. Test refresh-token kiểm tra riêng family bị thu hồi và giữ family khác, không phụ thuộc tổng số phiên có sẵn.
 
-Cần **JDK 21**, **Maven 3.9+**, Docker Compose (hoặc MySQL 8 có sẵn), cổng 3306 và 8080 trống.
+Sau browser smoke, đã chạy lại bộ unit/security/local-MySQL: **65 test đạt, 0 failure/error/skip** trên cùng DB test có dữ liệu smoke. Đã đồng bộ kỳ vọng test AI với ngữ cảnh môn/khối có sẵn và sửa regex bật bộ workflow local. Đây vẫn là bộ loại trừ Testcontainers, không phải toàn bộ test với Docker.
+
+**Chưa kiểm chứng:** Docker/Testcontainers trong lần xác nhận này, kết nối/migration database remote, HTTPS production, AI thật với API key/model của nhà cung cấp, scanner mã độc, toàn bộ thao tác quản trị/upload qua trình duyệt, tải cao hoặc khả năng truy cập đầy đủ. Browser smoke là một tập luồng đại diện, không phải E2E toàn bộ hệ thống.
+
+## Thiết lập local
+
+Các lệnh bên dưới dùng thư mục workspace tuyệt đối; đổi một lần nếu clone ở nơi khác:
 
 ```bash
+export PROJECT_ROOT='/Users/ngttu/Workspace/project_asm_prj'
+cd "$PROJECT_ROOT"
+```
+
+Cần JDK 21, Maven 3.9+, MySQL 8; Node.js, Playwright và Chrome chỉ cần cho browser smoke. Nếu dùng bộ công cụ có sẵn trong workspace này:
+
+```bash
+export JAVA_HOME="$PROJECT_ROOT/.tools/jdk-21.0.12.1+1/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PROJECT_ROOT/.tools/apache-maven-3.9.9/bin:$PATH"
 java -version
 mvn -version
-docker compose up -d --wait mysql
-export EDULAB_JWT_SECRET="$(openssl rand -base64 48)"
-mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Mở `http://localhost:8080/edulab/login`. Local datasource mặc định khớp Compose. Script `bash run-local.sh` thực hiện kiểm tra công cụ, khởi động MySQL và ứng dụng. Không dùng script local cho database remote.
+### Database xác nhận riêng tại cổng 3307
 
-Nếu đã có MySQL 8 chạy tại `localhost:3306`, với database `edulab_assignment` và user `edulab`/`edulab_local_password` có quyền trên database đó, có thể bỏ qua Docker:
+MySQL phải được chuẩn bị trước, chỉ lắng nghe loopback, có database **edulab_test** và user **edulab_test**, mật khẩu fixture **local-test-only-password**, chỉ có quyền trên database này. Đây là tài khoản thử nghiệm công khai, không được tái sử dụng ở nơi khác. Các lệnh dưới không tự khởi động MySQL và không xóa database.
+
+Trong terminal sạch, không nạp cấu hình remote:
 
 ```bash
-bash run-local.sh --existing-mysql
+export SPRING_PROFILES_ACTIVE=local
+export EDULAB_DB_URL='jdbc:mysql://127.0.0.1:3307/edulab_test?sslMode=DISABLED&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+export EDULAB_DB_USERNAME=edulab_test
+export EDULAB_DB_PASSWORD=local-test-only-password
+export EDULAB_JWT_SECRET="$(openssl rand -base64 48)"
+export EDULAB_AI_ENABLED=false
+export EDULAB_AI_PROVIDER=gatecheap
+export EDULAB_DEV_SCAN_BYPASS=false
+export EDULAB_UPLOAD_ROOT="$PROJECT_ROOT/.tools/test-uploads"
+mkdir -p "$EDULAB_UPLOAD_ROOT"
+
+# Build trước bằng lệnh kiểm thử ở phần bên dưới, rồi chạy embedded Tomcat:
+java -jar "$PROJECT_ROOT/target/edulab-khtn8.war" \
+  --spring.profiles.active=local --server.address=127.0.0.1 --server.port=8082
 ```
 
-Chế độ này không tự tạo hoặc khởi động MySQL. Cần JDK 21 và Maven trong PATH. URL local dùng `allowPublicKeyRetrieval=true` để xác thực `caching_sha2_password` của MySQL 8 qua loopback khi không bật TLS; **không dùng cấu hình này cho remote**. Remote vẫn phải dùng `sslMode=VERIFY_IDENTITY`.
+Mở **http://127.0.0.1:8082/edulab/**. Không chạy embedded Tomcat đồng thời với Tomcat ngoài trên cùng cổng. Nếu app đã được deploy như phiên xác nhận này, không cần khởi động thêm.
 
-Để chạy trực tiếp WAR đã build (MySQL phải đang chạy):
+JWT secret phải là Base64 của ít nhất 32 byte ngẫu nhiên; không có fallback trong source. Không in key ra log hoặc commit vào Git. Key sinh lại khi khởi động làm access token cũ mất hiệu lực; refresh session vẫn nằm trong database, nên chỉ xoay JWT key không thay thế việc thu hồi phiên.
+
+### Script phát triển mặc định (không phải môi trường xác nhận 3307)
+
+`$PROJECT_ROOT/run-local.sh` dùng database `localhost:3306/edulab_assignment` và cấu hình trong `$PROJECT_ROOT/docker-compose.yml`. Script từ chối biến `EDULAB_DB_URL/USERNAME/PASSWORD` đã được export để tránh vô tình dùng DB khác; mặc định khởi động MySQL bằng Docker Compose. `--existing-mysql` bỏ qua Docker nhưng yêu cầu database/user local đã có sẵn.
 
 ```bash
-export EDULAB_JWT_SECRET="$(openssl rand -base64 48)"
-java -jar target/edulab-khtn8.war --spring.profiles.active=local --server.address=127.0.0.1
+# Chỉ chạy ở terminal local riêng, không dùng để xác nhận vào DB 3307 ở trên.
+unset EDULAB_DB_URL EDULAB_DB_USERNAME EDULAB_DB_PASSWORD
+export SERVER_ADDRESS=127.0.0.1
+bash "$PROJECT_ROOT/run-local.sh"
+# Hoặc, nếu đã chuẩn bị MySQL theo đúng cấu hình local mặc định:
+# bash "$PROJECT_ROOT/run-local.sh" --existing-mysql
 ```
 
-Spring Boot **không tự đọc `.env`**. `.env.example` chỉ là mẫu biến môi trường; export các giá trị trong shell hoặc thiết lập bằng IDE/service manager. Không commit secret, `.env`, thư mục storage hoặc file build.
+URL mặc định của script: `http://127.0.0.1:8080/edulab/`. Không dùng profile local với DB quan trọng, kể cả qua tunnel loopback. `sslMode=DISABLED` và public-key retrieval chỉ dành cho DB loopback phát triển.
 
-JWT secret bắt buộc là Base64 của ít nhất 32 byte ngẫu nhiên, không có fallback trong source. Token sống 15 phút; chưa có refresh flow, nên cần đăng nhập lại khi hết hạn. Restart với secret mới làm hết hiệu lực token cũ.
+### Dữ liệu demo
 
-### Dữ liệu mẫu
+Flyway V1–V12 tạo schema, lớp 8A1, năm học 2026–2027, nội dung KHTN 8 cùng các khóa khởi động Toán, Ngữ văn, Tiếng Anh lớp 8 và Toán, Tiếng Anh lớp 10. Nội dung này là mẫu, không bao phủ toàn bộ chương trình các môn.
 
-Flyway V1–V8 tạo schema và seed: 3 bài, 1 quiz có 1 câu, lớp 8A1, năm học 2026–2027.
-
-| Tên đăng nhập | Vai trò |
+| Đăng nhập | Vai trò |
 |---|---|
 | `admin` | ADMIN |
 | `giaovien` | TEACHER |
 | `hocsinh` | STUDENT |
 | `phuhuynh` | PARENT |
 
-Mật khẩu demo: `ChangeMe123!`. Đã xác nhận đăng nhập qua HTTP bằng mật khẩu này cho cả bốn tài khoản trên MySQL local. Chỉ dùng tài khoản mẫu ở local. Không dùng dữ liệu cá nhân thật để thử nghiệm.
+Mật khẩu chung **`ChangeMe123!`**, chỉ dùng local. Browser smoke đã xác nhận đăng nhập cả bốn tài khoản. Chạy smoke tạo dữ liệu thật trong DB thử nghiệm và tiêu thụ lượt quiz; không tự rollback.
 
-### Upload và cách ly
+## Biến môi trường
 
-Mặc định file mới là **PENDING_SCAN**, không tải được. Chưa tích hợp scanner: file sẽ tiếp tục bị cách ly cho đến khi một scanner đáng tin được tích hợp; không có API tự đánh dấu CLEAN.
+Spring Boot **không tự đọc `.env`**. `$PROJECT_ROOT/.env.example` và `$PROJECT_ROOT/.env.remote.example` là mẫu; cấu hình shell/IDE/service manager bằng giá trị phù hợp. Riêng `$PROJECT_ROOT/run-remote.sh` chủ động source `$PROJECT_ROOT/.env.remote`: đây là shell code, chỉ được dùng tệp đáng tin, quyền `600`, không commit.
 
-Để thử với tệp tự tạo, tin cậy trên máy local:
+| Biến | Ý nghĩa / mặc định |
+|---|---|
+| `SPRING_PROFILES_ACTIVE` | `local` cho loopback; `remote` cho triển khai được duyệt. Không trộn local với remote/prod |
+| `EDULAB_DB_URL`, `EDULAB_DB_USERNAME`, `EDULAB_DB_PASSWORD` | Cấu hình datasource; luôn đặt rõ khi triển khai, không dựa vào host mặc định remote |
+| `EDULAB_JWT_SECRET` | Base64 ngẫu nhiên, ít nhất 32 byte decoded, bắt buộc |
+| `EDULAB_SERVER_PORT` | Cổng embedded Tomcat, mặc định 8080; không đổi connector của Tomcat ngoài |
+| `SERVER_ADDRESS` | Spring Boot bind address; đặt `127.0.0.1` khi chạy embedded local |
+| `EDULAB_COOKIE_SECURE` | Mặc định true; profile local dùng false. Remote bắt buộc HTTPS và secure cookies |
+| `EDULAB_COOKIE_SAME_SITE` | `Lax` mặc định; chỉ chấp nhận `Lax` hoặc `Strict` |
+| `EDULAB_UPLOAD_ROOT` | Mặc định `./storage` theo working directory; nên đặt đường dẫn tuyệt đối ngoài webroot |
+| `EDULAB_DEV_SCAN_BYPASS` | false; chỉ có thể bật trong local-only với tệp thử tin cậy |
+| `EDULAB_AI_ENABLED` | false mặc định; mẫu remote bật true nên cần chủ động tắt nếu chưa cấu hình AI |
+| `EDULAB_AI_PROVIDER` | `gatecheap` mặc định; `stub` chỉ được phép local-only |
+| `EDULAB_AI_BASE_URL` | `https://gatecheap.vn/v1`; phải là endpoint HTTPS đáng tin, không kèm credentials/query/fragment |
+| `EDULAB_AI_MODEL` | `gpt-6-astra` là tên cấu hình mặc định, **chưa xác nhận model này khả dụng trên tài khoản provider** |
+| `EDULAB_AI_API_KEY` | Bắt buộc nếu bật provider thật; chỉ cấu hình phía server |
+| `EDULAB_AI_MAX_OUTPUT_TOKENS` | 1000, cho phép 100–4000 |
+| `EDULAB_AI_DAILY_REQUEST_LIMIT` | 20 mỗi 24 giờ, cho phép 1–100 |
 
-```bash
-export EDULAB_DEV_SCAN_BYPASS=true
-mvn spring-boot:run -Dspring-boot.run.profiles=local
-```
+### Upload và AI: giới hạn vận hành
 
-Bypass chỉ được phép khi profile `local` bật và không có `remote`/`prod`. Đây **không phải quét mã độc**; signature không loại trừ polyglot hoặc nội dung PDF nguy hiểm. Không bật bypass trên máy phục vụ người dùng. Thư mục `EDULAB_UPLOAD_ROOT` phải nằm ngoài Tomcat webapps, thuộc tài khoản hệ điều hành chạy app, không chia sẻ quyền ghi với người dùng khác. Bản MVP chưa có dọn file mồ côi hoặc giao diện xóa upload.
+Tệp upload mặc định là **PENDING_SCAN** và không tải xuống được. **Chưa có scanner/queue** hoặc API tự đánh dấu CLEAN; tệp sẽ tiếp tục cách ly. Signature không loại trừ polyglot/PDF độc hại. Không bật scan bypass để phục vụ người dùng thật. Thư mục upload phải nằm ngoài Tomcat webapps, chỉ tài khoản chạy ứng dụng có quyền ghi; chưa có dọn tệp mồ côi hoặc UI xóa upload.
 
-## Database remote / Tomcat
+Khi bật GateCheap, **câu hỏi và nội dung bài liên quan được gửi đến bên thứ ba**. App không gửi token đăng nhập hay chủ động thêm hồ sơ học sinh; người dùng vẫn có thể nhập dữ liệu cá nhân vào câu hỏi. Cần thông báo quyền riêng tư, chính sách cho trẻ em và xem xét điều khoản lưu dữ liệu của provider trước khi bật. Bảng quota lưu metadata, không lưu prompt/câu trả lời; câu trả lời AI đăng vào diễn đàn được lưu như nội dung diễn đàn. Provider có timeout, không tự retry để tránh phát sinh phí lặp. Unit tests dùng mock HTTP, không chứng minh tích hợp AI thật hoạt động. Homepage chỉ liên kết tới trợ lý trong bài học, không giả lập phản hồi AI trực tiếp.
 
-**Không trỏ ứng dụng vào database quan trọng để thử nghiệm.** Flyway chạy khi khởi động; V4/V5 seed tài khoản/lớp demo, kể cả profile remote. Chỉ áp dụng vào database mới đã được duyệt, sao lưu trước. Không sửa migration đã được áp dụng.
+## Build và kiểm thử
 
-```bash
-export EDULAB_DB_URL='jdbc:mysql://your-db-host:3306/edulab_assignment?sslMode=VERIFY_IDENTITY&serverTimezone=UTC'
-export EDULAB_DB_USERNAME='your-app-user'
-export EDULAB_DB_PASSWORD='your-private-password'
-export EDULAB_JWT_SECRET='your-generated-base64-secret'
-export EDULAB_UPLOAD_ROOT='/srv/edulab/private-files'
-export SPRING_PROFILES_ACTIVE=remote
-mvn clean verify
-mvn spring-boot:run -Dspring-boot.run.profiles=remote
-```
+### Unit/security và workflow trên MySQL local đã chuẩn bị
 
-Dùng chứng chỉ CA tin cậy/truststore phù hợp với máy MySQL; không tắt kiểm tra TLS. Remote cần HTTPS phía trình duyệt vì cookie Secure bắt buộc. Không bật đồng thời profile local/remote.
-
-Ứng dụng **từ chối khởi động ngoài local** khi còn tài khoản enabled mang hash demo. Sau migration đầu tiên, DBA cần đặt hash BCrypt riêng cho admin, đổi mật khẩu các tài khoản demo còn dùng hoặc disable chúng, và tăng `auth_version`. Không tắt guard để tránh bước này. Chưa có UI quản lý mật khẩu/tạo giáo viên; cần quy trình quản trị DB có kiểm soát trước khi triển khai thật.
-
-Build WAR và deploy thủ công sau khi kiểm thử:
-
-```bash
-mvn clean verify
-# Chỉ copy sau khi đã cấu hình env/HTTPS cho Tomcat:
-cp target/edulab-khtn8.war "$CATALINA_HOME/webapps/edulab.war"
-```
-
-Tomcat 10.1 chạy Java 21. Tên `edulab.war` tạo context `/edulab`; nếu đổi tên WAR, context bên Tomcat cũng đổi. Bootstrap tải từ CDN nên giao diện cần truy cập mạng; JS nghiệp vụ nằm trong ứng dụng.
-
-## Kiểm thử
+Chạy trước browser smoke trên DB thử có dữ liệu demo và còn lượt quiz:
 
 ```bash
-mvn clean verify
+export EDULAB_TEST_DB_URL='jdbc:mysql://127.0.0.1:3307/edulab_test?sslMode=DISABLED&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+export EDULAB_AI_ENABLED=false
+export EDULAB_AI_PROVIDER=gatecheap
+export EDULAB_DEV_SCAN_BYPASS=false
+mvn -f "$PROJECT_ROOT/pom.xml" -B '-Dtest=!MysqlIntegrationTest' clean verify
 ```
 
-- Unit: điểm có trọng số, đáp án ngoại lai, bài hết giờ, max attempts/submit lại, lọc HTML, tiến độ, parent/teacher policy, định dạng upload.
-- MockMvc: API chưa đăng nhập 401, thiếu CSRF 403, lấy CSRF thật từ endpoint rồi login sai trả 401; cho phép JSP forward nội bộ nhưng không mở quyền request trực tiếp.
-- MySQL Testcontainers: Flyway + Hibernate validation, hash demo, quiz snapshot/chấm bài, tạo/thu hồi link. **Tự skip nếu không có Docker**; kiểm tra số skipped trong `target/surefire-reports`.
-- Không có test nào cần hoặc được cấu hình kết nối database remote.
+Lệnh này tạo `$PROJECT_ROOT/target/edulab-khtn8.war`. Bộ `LocalMysqlWorkflowTest` chỉ bật khi `EDULAB_TEST_DB_URL` khớp loopback cổng 3307/database test; dùng user/password fixture đã nêu. Nó chạy migration local, kiểm tra admin content, autosave/hết giờ, prerequisite, Boolean predicates, giao bài/nhận xét/thu hồi liên kết và refresh rotation/reuse. Các test workflow dùng transaction rollback; database vẫn cần schema/seed và không được dùng cho dữ liệu quan trọng. Không có biến URL test thì bộ này bị **skip**, không phải đã đạt.
 
-Smoke-test thủ công sau khi build thành công:
-1. Đăng ký học sinh/phụ huynh, login/logout; kiểm tra lỗi credential, hết hạn token, CSRF.
-2. Học sinh mở bài, hoàn thành, tải lại dashboard; giáo viên/phụ huynh không cập nhật tiến độ được.
-3. Bắt đầu quiz, kiểm tra Network không lộ đáp án, nộp, xem lại, thử hết lượt/hết giờ và ID lượt của người khác.
-4. Học sinh tạo mã, phụ huynh nhập; dùng lại mã bị từ chối, hủy liên kết mất quyền xem báo cáo.
-5. Giáo viên chỉ xem lớp được phân công. Admin phân công/ghi danh; tài khoản khác không gọi API admin được.
-6. Đăng thread/trả lời với ảnh/PDF; thử file giả, file quá lớn, file pending và URL file không có quyền.
-7. Bật AI mẫu local; kiểm tra nhãn mẫu, nguồn bài học và hạn mức.
-8. Kiểm tra JSP trên Tomcat thật ở màn hình điện thoại và desktop.
+Unit/security tests còn kiểm tra chấm điểm, kiểm tra đáp án, lọc HTML, upload/storage, phân quyền, JWT/CSRF, migration guard, rate limiter, quota và adapter AI mock. Xem `$PROJECT_ROOT/target/surefire-reports` để biết số test thực sự chạy.
 
-## Giới hạn trước khi dùng thực tế
+### Docker/Testcontainers (xác nhận riêng)
 
-Đây là MVP học tập, **không phải bản production-ready**. Chưa có: refresh-token rotation, khôi phục mật khẩu/email verification, rate limit login phân tán, CRUD nội dung/question bank và tài khoản giáo viên đầy đủ, khóa tiến độ theo prerequisite, bài tập giao theo lớp, scanner/queue, báo cáo vi phạm hoàn chỉnh, thông báo, AI provider thật, concurrency/load/browser E2E tests. Admin member picker hiển thị tối đa 500 tài khoản; báo cáo hiển thị 100 kết quả quiz gần nhất. Cần review bảo mật, quyền riêng tư trẻ em và vận hành trước khi phục vụ học sinh thật.
+```bash
+mvn -f "$PROJECT_ROOT/pom.xml" -B clean verify
+```
+
+`MysqlIntegrationTest` tạo MySQL container riêng khi Docker hoạt động, tự skip nếu không có Docker. Lần xác nhận 65 test ở trên **loại rõ bộ này**, không tuyên bố đã chạy nó. Không có test nào cần database remote. Không nạp `.env.remote` khi build/test. Không dùng `-DskipTests` để coi build là đã kiểm chứng.
+
+### Browser smoke
+
+Chỉ dùng server local có dữ liệu demo, AI tắt và scan bypass tắt. `EDULAB_SMOKE_URL` được giới hạn dạng `http://127.0.0.1:<port>/edulab`, nhưng **không thể chứng minh DB phía server là local**: người vận hành phải kiểm tra datasource trước khi chạy.
+
+Playwright là công cụ test, không phải dependency production. Nếu chưa có, cài riêng vào thư mục tooling bị Git ignore:
+
+```bash
+npm install --prefix "$PROJECT_ROOT/.tools/browser" --no-save --package-lock=false playwright
+```
+
+Lệnh đã dùng với Chrome cài trên macOS:
+
+```bash
+EDULAB_SMOKE_URL='http://127.0.0.1:8082/edulab' \
+EDULAB_PLAYWRIGHT_PATH="$PROJECT_ROOT/.tools/browser/node_modules/playwright" \
+EDULAB_CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+EDULAB_SCREENSHOT_DIR="$PROJECT_ROOT/.tools/screenshots" \
+node "$PROJECT_ROOT/scripts/browser-smoke.cjs"
+```
+
+Đổi `EDULAB_CHROME_PATH` thành executable Chrome/Chromium tuyệt đối trên hệ điều hành khác. Script không tự cài browser. Nó thử quiz PRACTICE còn lượt, bỏ qua quiz đã hết lượt; khi tất cả đều hết lượt thì báo lỗi. Dùng DB demo thử nghiệm mới hoặc khôi phục snapshot test có chủ đích, **không nới giới hạn nghiệp vụ hoặc xóa dữ liệu thật** để chạy lại. Script tạo thread, liên kết, bài giao và nhận xét, không dọn những dữ liệu này. Không chạy song song với test đang thao tác cùng tài khoản demo.
+
+Ảnh chụp: homepage desktop/mobile, bài học, gia đình, diễn đàn, báo cáo học sinh/phụ huynh và admin trong `$PROJECT_ROOT/.tools/screenshots`. Các luồng có ảnh/report cá nhân thật không được công khai hoặc commit.
+
+Kiểm tra cú pháp/whitespace bổ sung:
+
+```bash
+node --check "$PROJECT_ROOT/scripts/browser-smoke.cjs"
+find "$PROJECT_ROOT/src/main/resources/static/js" -name '*.js' -exec node --check {} \;
+bash -n "$PROJECT_ROOT/run-local.sh" "$PROJECT_ROOT/run-remote.sh"
+git -C "$PROJECT_ROOT" diff --check
+```
+
+## Auto-update Git (commit + push)
+
+Remote dự kiến: `https://github.com/ngttu06/edulab_assignment.git`, nhánh `main`. Script dùng **Node.js 18+ và Git**, không thêm dependency, không build/deploy ứng dụng và không thay database. Chạy từ bất kỳ thư mục nào; script luôn thao tác repository chứa nó.
+
+```bash
+# Chỉ cần thiết lập origin nếu bản clone chưa có remote này:
+git -C "$PROJECT_ROOT" remote -v
+# git -C "$PROJECT_ROOT" remote add origin https://github.com/ngttu06/edulab_assignment.git
+
+# Xem những file sẽ được chọn, không stage/commit/kết nối mạng:
+node "$PROJECT_ROOT/scripts/git-auto-update.cjs" --dry-run
+
+# Đồng bộ một lần; có thể đặt commit message riêng:
+node "$PROJECT_ROOT/scripts/git-auto-update.cjs" --once --message "chore: update EduLab"
+
+# Tự commit + push ngay lần đầu, sau đó kiểm tra lại mỗi 60 giây; Ctrl+C để dừng:
+node "$PROJECT_ROOT/scripts/git-auto-update.cjs" --watch --interval 60
+
+# Kiểm thử script bằng repository tạm và bare remote local, không dùng GitHub:
+node --test "$PROJECT_ROOT/scripts/git-auto-update.test.cjs"
+```
+
+**Xác thực trước:** cấu hình quyền ghi repo bằng credential helper của Git hoặc GitHub CLI trên máy. HTTPS GitHub cần token/credential helper, không dùng mật khẩu tài khoản. Không gửi token vào chat, không ghi token trong URL, script, `.env.example` hay commit. Có thể chạy `git -C "$PROJECT_ROOT" ls-remote origin` trong terminal riêng để kiểm tra truy cập. Nếu repo không tồn tại hoặc tài khoản không có quyền, cần xử lý trên GitHub trước. Script không hỏi mật khẩu tương tác và dừng khi xác thực thất bại.
+
+**Phạm vi và an toàn:**
+
+- Chỉ chọn `src/`, `scripts/`, `README.md`, `pom.xml`, `docker-compose.yml`, `.gitignore`, hai mẫu `.env.example`/`.env.remote.example` và hai script chạy local/remote. File ngoài danh sách phải review/commit thủ công. Tôn trọng `.gitignore`; bỏ qua secret local, `.tools/`, ảnh kiểm thử, `target/`, upload, `.agents/` và tài liệu Mapstudy tải về.
+- Chặn một số dạng private key/token phổ biến và đường dẫn nhạy cảm; **không phải secret scanner đầy đủ**. Người dùng vẫn phải review mã nguồn và lịch sử trước khi chia sẻ repo. Các commit local đã có sẽ được push cùng nhánh, không được script quét lại toàn bộ lịch sử.
+- Chỉ chạy trên `main`, yêu cầu index chưa có file được stage thủ công và không đang merge/rebase. Kiểm tra `origin/main` trước khi commit; nếu remote đi trước/phân kỳ thì dừng, **không tự pull/merge/rebase/reset/force-push**. Fetch/push URL phải giống nhau, không mirror hoặc push tag tự động.
+- Watcher có khóa riêng trong Git common directory, không chạy hai bản cùng lúc. **Dừng watcher trước khi thao tác Git thủ công.** Khóa riêng không ngăn IDE/lệnh Git khác; nếu bị kill cứng, kiểm tra PID trong `edulab-auto-update.lock` trước khi tự xóa khóa cũ.
+- Lỗi kiểm tra trước push sẽ dừng watcher. Nếu đã commit nhưng push bị từ chối thì giữ commit local; sửa nguyên nhân rồi chạy lại sẽ push commit đó, không tạo commit rỗng. Nếu commit hook/check thất bại, kiểm tra `git status` và xử lý index thủ công trước khi chạy lại.
+- Watcher commit các file đã lưu kể cả đang viết dở; **không tự chạy Maven/browser tests và không đảm bảo commit xanh**. Đây là sao lưu mã nguồn opt-in, không phải pipeline CI. Không tự cài service khởi động cùng máy; cửa sổ terminal phải còn chạy.
+
+## Deploy trên Tomcat ngoài
+
+Dùng **Tomcat 10.1 + JDK 21**, không dùng Tomcat 9 (`javax.*`). Với Tomcat ngoài, connector quyết định địa chỉ/cổng, tên WAR quyết định context; `EDULAB_SERVER_PORT` và `server.servlet.context-path` của embedded server không thay thế cấu hình đó.
+
+### Local đã xác nhận
+
+Thiết lập biến môi trường local/database 3307 như phần trên trong terminal sạch. Kiểm tra không có cấu hình `setenv.sh` hoặc service manager ghi đè thành remote. Với bộ Tomcat hiện tại:
+
+```bash
+export CATALINA_HOME="$PROJECT_ROOT/.tools/tomcat/apache-tomcat-10.1.60"
+export CATALINA_BASE="$CATALINA_HOME"
+export CATALINA_PID="$PROJECT_ROOT/.tools/tomcat-test.pid"
+export CATALINA_OUT='/tmp/edulab-tomcat-final.log'
+```
+
+Connector HTTP trong `$CATALINA_BASE/conf/server.xml` phải dùng loopback cho local, ví dụ:
+
+```xml
+<Connector address="127.0.0.1" port="8082" protocol="HTTP/1.1"
+           connectionTimeout="20000" redirectPort="8443" />
+```
+
+Quy trình thay deployment:
+
+1. Build/test thành công. Dừng đúng Tomcat này bằng `$CATALINA_HOME/bin/shutdown.sh` nếu đang chạy; đợi process thoát và cổng 8082 không còn listener. Không kill process lạ chỉ vì trùng cổng.
+2. Sao lưu WAR cũ nếu cần rollback. Upload phải ở ngoài thư mục deployment. Chỉ sau khi server đã dừng, xóa bản bung cũ **`$CATALINA_BASE/webapps/edulab`** và JSP cache **`$CATALINA_BASE/work/Catalina/localhost/edulab`**, không xóa toàn bộ webapps/work hoặc database.
+3. Copy WAR đã xác nhận, đặt tên `edulab.war` để có `/edulab`, rồi start với môi trường local rõ ràng:
+
+```bash
+cp "$PROJECT_ROOT/target/edulab-khtn8.war" "$CATALINA_BASE/webapps/edulab.war"
+shasum -a 256 "$PROJECT_ROOT/target/edulab-khtn8.war" "$CATALINA_BASE/webapps/edulab.war"
+"$CATALINA_HOME/bin/startup.sh"
+curl --fail --silent --show-error --output /dev/null 'http://127.0.0.1:8082/edulab/'
+```
+
+Đợi startup hoàn tất trước HTTP/browser smoke; đối chiếu checksum và log mới, không dựa vào log của deployment cũ. Khi dùng service manager, cấu hình env tại service; export trong terminal không tự truyền vào service đã chạy. Không bật shell tracing hoặc log biến môi trường chứa secret.
+
+### Remote / production: không tự động migrate
+
+**Chưa kết nối hoặc thay đổi database remote trong lần xác nhận này.** Host mặc định trong profile/mẫu remote không phải đích thử nghiệm và không phải quyền cho phép chạy migration.
+
+- Automatic Flyway chỉ được phép với **profile local-only và datasource loopback**. Base/remote mặc định tắt Flyway; guard từ chối bật startup migration ngoài local, kể cả khi bị override. Hibernate dùng `ddl-auto=validate`, không tự tạo schema.
+- DBA cần review và chạy riêng 12 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
+- Ngoài local, app từ chối startup nếu còn tài khoản enabled mang hash demo. DBA phải đặt hash BCrypt riêng cho admin, đổi mật khẩu/disable các tài khoản demo, tăng `auth_version` và thu hồi refresh sessions liên quan. Đây không thay thế audit mật khẩu và quyền tài khoản đầy đủ.
+- Cấu hình rõ URL/user/password được duyệt; URL bắt buộc `sslMode=VERIFY_IDENTITY`, CA/truststore đúng. Không dùng public-key retrieval hoặc bỏ kiểm tra TLS cho remote. Dùng tài khoản ứng dụng quyền tối thiểu, tách tài khoản migration có DDL.
+- Bắt buộc HTTPS, secure cookies, reverse proxy/connector được harden, upload riêng ngoài webroot. Không dùng profile local hoặc scan bypass ở server phục vụ người dùng. Gỡ/khóa ứng dụng manager/examples mặc định của Tomcat khi triển khai thật.
+- Cấp JWT key mạnh, riêng từng môi trường, lưu trong secret manager/service configuration; sao lưu và giám sát DB/storage. Không commit `.env`, API key, log, upload, screenshot người dùng hoặc build/tool state.
+- Chỉ bật AI sau khi xác nhận provider/model/key, quota/chi phí và quyền riêng tư; nếu chưa sẵn sàng đặt `EDULAB_AI_ENABLED=false`.
+
+`$PROJECT_ROOT/run-remote.sh` chạy WAR bằng embedded Tomcat với profile remote, không build hoặc migrate giúp bạn. Nó đọc `.env.remote` nếu có, yêu cầu DB password/JWT secret và yêu cầu AI key nếu bật AI. Chỉ dùng sau khi hoàn tất các bước duyệt triển khai; kiểm tra WAR không cũ. Với Tomcat ngoài, cấu hình cùng các biến qua service manager và deploy thủ công, không chạy script này song song.
+
+## Cấu trúc và giới hạn còn lại
+
+- `$PROJECT_ROOT/src/main/java/vn/edu/khtn8`: identity/security, content, assessment, school, community/files, administration, AI và deployment guards.
+- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V12; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
+- `$PROJECT_ROOT/src/main/webapp/WEB-INF/jsp`: JSP views; `$PROJECT_ROOT/src/test/java`: unit, security và workflow tests.
+- `$PROJECT_ROOT/scripts/browser-smoke.cjs`: smoke test trình duyệt local-only; `$PROJECT_ROOT/.tools`: công cụ/ảnh/upload local bị Git ignore.
+
+Còn thiếu scanner/queue, khôi phục mật khẩu/email verification, đổi mật khẩu self-service, rate limit phân tán, UI chỉnh sửa/xóa/versioning nội dung đầy đủ, quy trình kiểm duyệt/báo cáo vi phạm hoàn chỉnh, thông báo, quản trị lưu trữ/retention, audit vận hành và kiểm thử tải/concurrency. Không có chứng nhận bảo mật hay độ đúng sư phạm của AI. Báo cáo quiz và bài giao giới hạn 100 dòng, nhận xét 50 dòng; member picker tối đa 500 tài khoản. Việc giao bài không tự cấp thêm lượt làm quiz.
+
+Một số timestamp trong báo cáo/bài giao/nhận xét hiện được JSP in trực tiếp từ JDBC theo timezone của JVM, trong khi nhãn có thể ghi `UTC`. Trên server không chạy UTC, nhãn hiển thị này có thể gây hiểu nhầm. Cần chuẩn hóa định dạng timezone trước khi dùng hạn nộp với người dùng thật; smoke hiện xác nhận luồng và trạng thái, không xác nhận chuyển đổi timezone trên giao diện.
+
+Bootstrap 5.3.3 và Quicksand được phục vụ nội bộ trong `/Users/ngttu/Workspace/project_asm_prj/src/main/resources/static/css` (kèm giấy phép MIT/OFL); giao diện không cần CDN và không nới CSP. Icon SVG, banner và bìa khóa học là tài sản EduLab, không sao chép ảnh giáo viên hay quảng cáo tham chiếu. Chưa có coverage mọi trình duyệt, thao tác admin/upload hoặc kiểm tra accessibility đầy đủ. Cần review bảo mật, quyền riêng tư trẻ em, nội dung môn học và vận hành trước khi đưa vào sử dụng thật.
+
+## Giao diện và hồi quy responsive
+
+- Header 56 px, sidebar trái, nội dung trung tâm, cột tiện ích trên desktop, footer nhiều cột; màu `#155e94`/`#2470aa`, Quicksand 14 px.
+- Các trang nghiệp vụ dùng khung rộng để đọc bài, làm quiz và thao tác bảng; điện thoại dùng menu drawer có Escape, focus trap và trả focus về nút mở.
+- Các component dùng chung nằm tại `/Users/ngttu/Workspace/project_asm_prj/src/main/webapp/WEB-INF/tags`; dữ liệu và hook JavaScript nghiệp vụ vẫn giữ nguyên.
+- Chạy theme regression riêng (không tạo nội dung, nhưng đăng nhập/đăng xuất sẽ thay đổi phiên của tài khoản demo); **không chạy song song với smoke nghiệp vụ vì logout thu hồi mọi phiên của tài khoản**:
+
+```bash
+EDULAB_SMOKE_URL='http://127.0.0.1:8083/edulab' \
+EDULAB_PLAYWRIGHT_PATH='/Users/ngttu/Workspace/project_asm_prj/.tools/browser/node_modules/playwright' \
+EDULAB_SCREENSHOT_DIR='/Users/ngttu/Workspace/project_asm_prj/.tools/screenshots/theme' \
+node /Users/ngttu/Workspace/project_asm_prj/scripts/browser-theme.cjs
+```
+
+Script kiểm tra viewport 1440/1024/768/390/320 px, drawer keyboard, lọc/tìm kiếm, trạng thái rỗng/404, font/assets nội bộ, CSP, overflow và rendering bốn vai trò. Script smoke nghiệp vụ vẫn ở `/Users/ngttu/Workspace/project_asm_prj/scripts/browser-smoke.cjs`.

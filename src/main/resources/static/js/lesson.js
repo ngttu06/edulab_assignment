@@ -2,11 +2,12 @@ document.getElementById('aiForm')?.addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget, button = form.querySelector('button');
     button.disabled = true;
+    document.getElementById('aiAnswer').textContent = 'Trợ lý đang chuẩn bị hướng dẫn...';
     try {
         const answer = await window.edulab.api('/api/v1/ai/questions', {method: 'POST', body: {
             lessonId: Number(form.dataset.id), question: document.getElementById('aiQuestion').value
         }});
-        document.getElementById('aiAnswer').textContent = 'AI MẪU — ' + answer.text + ' Nguồn: ' + answer.sourceLabels.join(', ') + '. Cần giáo viên kiểm tra.';
+        document.getElementById('aiAnswer').textContent = (answer.sample ? 'AI MẪU — ' : 'AI HỖ TRỢ — ') + answer.text + '\n\nTài liệu tham khảo: ' + answer.sourceLabels.join(', ') + '. Cần giáo viên kiểm tra.';
     } catch (error) { document.getElementById('aiAnswer').textContent = error.message; }
     finally { button.disabled = false; }
 });

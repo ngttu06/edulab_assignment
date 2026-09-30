@@ -35,6 +35,7 @@ class AuthSecurityTest {
     @MockBean RegistrationService registration;
     @MockBean DatabaseUserDetailsService users;
     @MockBean JwtService jwt;
+    @MockBean vn.edu.khtn8.identity.security.LoginRateLimiter limiter;
 
     @Test void unauthenticatedApiIs401() throws Exception {
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
@@ -50,6 +51,10 @@ class AuthSecurityTest {
     @Test void directJspRequestStillRequiresAuthentication() throws Exception {
         mvc.perform(get("/WEB-INF/jsp/auth/login.jsp"))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"));
+    }
+    @Test void internalJspIncludeIsNotBlockedForPublicHome() throws Exception {
+        mvc.perform(get("/WEB-INF/jsp/home.jsp").with(request->{request.setDispatcherType(DispatcherType.INCLUDE);return request;}))
+                .andExpect(status().isNotFound());
     }
     @Test void loginWithoutCsrfIs403() throws Exception {
         mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)

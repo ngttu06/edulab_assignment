@@ -12,11 +12,15 @@ import vn.edu.khtn8.assessment.QuizModels.*;
 @Controller
 public class QuizController {
     private final QuizService service;
-    public QuizController(QuizService service) { this.service = service; }
+    private final vn.edu.khtn8.content.service.LearningPathService path;
+    private final vn.edu.khtn8.content.service.CatalogService catalog;
+    public QuizController(QuizService service,vn.edu.khtn8.content.service.LearningPathService path,vn.edu.khtn8.content.service.CatalogService catalog) { this.service = service;this.path=path;this.catalog=catalog; }
 
     @GetMapping("/quizzes")
-    public String list(Model model) {
-        model.addAttribute("quizzes", service.list());
+    public String list(Model model,@ModelAttribute("filter") vn.edu.khtn8.content.dto.CatalogFilter filter) {
+        vn.edu.khtn8.content.web.CatalogController.filters(model,catalog,0);
+        var ids=new java.util.HashSet<>(catalog.quizIds(filter));
+        model.addAttribute("quizzes", service.list().stream().filter(q->ids.contains(q.id())).toList());
         model.addAttribute("pageTitle", "Luyện tập · EduLab");
         model.addAttribute("contentPage", "/WEB-INF/jsp/quiz/list.jsp");
         return "layout/default";
@@ -29,12 +33,23 @@ public class QuizController {
         return "layout/default";
     }
     @GetMapping("/api/v1/quizzes") @ResponseBody
-    public List<Quiz> apiList() { return service.list(); }
+    public List<Quiz> apiList(@ModelAttribute vn.edu.khtn8.content.dto.CatalogFilter filter) {
+        var ids=new java.util.HashSet<>(catalog.quizIds(filter));
+        return service.list().stream().filter(q->ids.contains(q.id())).toList();
+    }
     @PostMapping("/api/v1/quizzes/{id}/attempts") @ResponseBody
-    public AttemptView start(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) { return service.start(user.id(), id); }
+    public AttemptView start(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        if(vn.edu.khtn8.school.SchoolService.hasRole(user,"STUDENT")) path.requireQuizUnlocked(user.id(),id);
+        return service.start(user.id(), id);
+    }
     @GetMapping("/api/v1/quiz-attempts/{id}") @ResponseBody
     public AttemptView get(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) { return service.get(user.id(), id); }
     @PostMapping("/api/v1/quiz-attempts/{id}/submit") @ResponseBody
     public AttemptView submit(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user,
                               @Valid @RequestBody Submission submission) { return service.submit(user.id(), id, submission.answers()); }
+
+    @PutMapping("/api/v1/quiz-attempts/{id}/answers") @ResponseBody
+    public AttemptView save(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody Submission submission) {
+        return service.save(user.id(),id,submission.answers());
+    }
 }

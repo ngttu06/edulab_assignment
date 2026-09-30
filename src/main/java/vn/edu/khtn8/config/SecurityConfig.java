@@ -38,8 +38,8 @@ public class SecurityConfig {
                 .csrf(csrfConfigurer -> csrfConfigurer.csrfTokenRepository(csrf))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .dispatcherTypeMatchers(DispatcherType.FORWARD).permitAll()
-                        .requestMatchers("/", "/login", "/register", "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/csrf",
+                        .dispatcherTypeMatchers(DispatcherType.FORWARD,DispatcherType.INCLUDE).permitAll()
+                        .requestMatchers("/", "/courses", "/courses/*", "/login", "/register", "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh", "/api/v1/auth/csrf",
                                 "/css/**", "/js/**", "/favicon.ico", "/actuator/health").permitAll()
                         .requestMatchers("/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/teacher/**", "/api/v1/teacher/**").hasAnyRole("TEACHER", "ADMIN")
@@ -75,8 +75,7 @@ public class SecurityConfig {
 
     @Bean
     DaoAuthenticationProvider authenticationProvider(DatabaseUserDetailsService users, PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(users);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(users);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }

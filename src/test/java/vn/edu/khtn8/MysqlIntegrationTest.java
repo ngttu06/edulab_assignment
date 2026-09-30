@@ -48,7 +48,7 @@ class MysqlIntegrationTest {
     private AuthenticatedUser user(String username, String role) { return new AuthenticatedUser(id(username),username,username,"unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_"+role))); }
 
     @Test void migrationsAndDemoPasswordMatch() {
-        assertEquals(8, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE", Integer.class));
+        assertEquals(11, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE", Integer.class));
         assertTrue(encoder.matches("ChangeMe123!", jdbc.queryForObject("SELECT password_hash FROM users WHERE username='hocsinh'", String.class)));
         assertEquals(3, lessons.findPublishedForStudent(id("hocsinh")).size());
         assertEquals(3L, ((Number)lessons.progressSummary(id("hocsinh")).get("total_lessons")).longValue());
@@ -57,9 +57,9 @@ class MysqlIntegrationTest {
         long student = id("hocsinh");
         var attempt = quizzes.start(student, quizzes.list().getFirst().id());
         assertNull(attempt.questions().getFirst().options().getFirst().correct());
-        long question = attempt.questions().getFirst().id();
-        long correct = jdbc.queryForObject("SELECT id FROM question_options WHERE question_id=? AND is_correct=TRUE", Long.class, question);
-        var result = quizzes.submit(student, attempt.id(), Map.of(question,correct));
+        Map<Long,Long> answers=new java.util.HashMap<>();
+        for(var question:attempt.questions())answers.put(question.id(),jdbc.queryForObject("SELECT id FROM question_options WHERE question_id=? AND is_correct=TRUE",Long.class,question.id()));
+        var result = quizzes.submit(student, attempt.id(), answers);
         assertEquals("GRADED",result.status());
         assertEquals(0,java.math.BigDecimal.TEN.compareTo(result.score()));
         assertEquals(result.score(), quizzes.submit(student, attempt.id(), Map.of()).score());

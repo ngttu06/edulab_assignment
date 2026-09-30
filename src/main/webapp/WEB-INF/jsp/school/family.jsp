@@ -1,6 +1,6 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<h1 class="h3">Liên kết phụ huynh — học sinh</h1>
+<span class="eyebrow">CÙNG CON TIẾN BỘ</span><h1 class="h3">Liên kết phụ huynh — học sinh</h1>
 <p>Chỉ chia sẻ mã riêng với phụ huynh của bạn. Mã dùng một lần, hết hạn sau 15 phút. Khi nhập mã hợp lệ, phụ huynh được xem tiến độ và điểm. Bạn có thể hủy quyền này bên dưới.</p>
 <p id="schoolNotice" role="status"></p>
 <c:if test="${pageContext.request.isUserInRole('STUDENT')}"><button id="generateCode" class="btn btn-primary">Tạo mã mới</button> <button id="revokeCodes" class="btn btn-outline-danger">Hủy mã chưa dùng</button><p id="linkCode" class="mt-3 text-break" role="status"></p></c:if>

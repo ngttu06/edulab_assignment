@@ -15,10 +15,13 @@ import vn.edu.khtn8.identity.service.RegistrationService;
 public class AuthController {
     private final AuthenticationService authenticationService;
     private final RegistrationService registrationService;
+    private final vn.edu.khtn8.identity.security.LoginRateLimiter limiter;
 
-    public AuthController(AuthenticationService authenticationService, RegistrationService registrationService) {
+    public AuthController(AuthenticationService authenticationService, RegistrationService registrationService,
+            vn.edu.khtn8.identity.security.LoginRateLimiter limiter) {
         this.authenticationService = authenticationService;
         this.registrationService = registrationService;
+        this.limiter=limiter;
     }
 
     @GetMapping("/login") public String loginPage() { return "auth/login"; }
@@ -37,6 +40,7 @@ public class AuthController {
     @PostMapping("/api/v1/auth/login") @ResponseBody
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
             jakarta.servlet.http.HttpServletRequest servletRequest, HttpServletResponse response) {
+        limiter.check(servletRequest.getRemoteAddr());
         return ResponseEntity.ok(authenticationService.login(request, servletRequest, response));
     }
 
@@ -44,6 +48,13 @@ public class AuthController {
     public CurrentUserResponse me(@AuthenticationPrincipal AuthenticatedUser user) {
         return new CurrentUserResponse(user.id(), user.username(), user.fullName(),
                 user.getAuthorities().iterator().next().getAuthority().substring("ROLE_".length()));
+    }
+
+    @PostMapping("/api/v1/auth/refresh") @ResponseBody
+    public LoginResponse refresh(@CookieValue(name="EDULAB_REFRESH", required=false) String token,
+            jakarta.servlet.http.HttpServletRequest request, HttpServletResponse response) {
+        limiter.check(request.getRemoteAddr());
+        return authenticationService.refresh(token,request,response);
     }
 
     @PostMapping("/api/v1/auth/logout") @ResponseBody

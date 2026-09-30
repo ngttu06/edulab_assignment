@@ -94,6 +94,16 @@ public class ForumService {
         }
         return false;
     }
+
+    public List<Map<String,Object>> aiAnswers(AuthenticatedUser user,long threadId) {
+        thread(user,threadId);
+        return jdbc.queryForList("SELECT answer,source_label,created_at FROM forum_ai_answers WHERE thread_id=? ORDER BY id DESC LIMIT 5",threadId);
+    }
+    public void saveAi(AuthenticatedUser user,long threadId,String answer,String source) {
+        var thread=thread(user,threadId);
+        if(((Number)thread.get("author_id")).longValue()!=user.id()) throw new AccessDeniedException("Only author can request AI");
+        jdbc.update("INSERT INTO forum_ai_answers(thread_id,requested_by,answer,source_label) VALUES(?,?,?,?)",threadId,user.id(),answer,source);
+    }
     private long insert(String sql, Object... args) {
         GeneratedKeyHolder key = new GeneratedKeyHolder();
         jdbc.update(connection -> {

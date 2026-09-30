@@ -11,12 +11,27 @@
 .env
 .env.*
 !.env.example
+!.env.remote.example
 storage/
 
 # Local tool state
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 .tools/
+.agents/
+
+# Downloaded design references (not EduLab application assets)
+/Mapstudy.edu.vn*.html
+/Mapstudy.edu.vn*_files/
+
+# OS metadata and private key material
+.DS_Store
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
 
 # Logs
 *.log

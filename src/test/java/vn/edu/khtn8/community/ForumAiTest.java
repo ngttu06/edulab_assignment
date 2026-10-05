@@ -17,14 +17,14 @@ class ForumAiTest {
     private final AiService ai=mock(AiService.class);
     private final ForumController controller=new ForumController(forum,ai,mock(LessonService.class));
     @Test void failedOrDisabledAiKeepsTheCreatedThreadWithoutSavingAnAnswer() {
-        when(forum.create(user,2,"Title","Body")).thenReturn(9L);
+        when(forum.create(user,2,"Title","Body",3L,List.of())).thenReturn(9L);
         when(ai.ask(user,3,"Title\nBody")).thenThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE));
         var result=controller.create(user,new ForumController.ThreadRequest(2,"Title","Body",3L,true));
         assertEquals(9L,result.get("id"));assertEquals(true,result.get("aiUnavailable"));
-        verify(forum).create(user,2,"Title","Body");verify(forum,never()).saveAi(any(),anyLong(),anyString(),anyString());
+        verify(forum).create(user,2,"Title","Body",3L,List.of());verify(forum,never()).saveAi(any(),anyLong(),anyString(),anyString());
     }
     @Test void forumUsesLessonAssistantAndSavesServerVerifiedSourceLabels() {
-        when(forum.create(eq(user),eq(2L),eq("Title"),anyString())).thenReturn(9L);
+        when(forum.create(eq(user),eq(2L),eq("Title"),anyString(),eq(3L),eq(List.of()))).thenReturn(9L);
         when(ai.ask(eq(user),eq(3L),anyString())).thenReturn(new AiService.Answer("gatecheap",false,"Answer",new String[]{"Published lesson"},true));
         var result=controller.create(user,new ForumController.ThreadRequest(2,"Title","x".repeat(3000),3L,true));
         assertEquals(false,result.get("aiUnavailable"));
@@ -33,7 +33,7 @@ class ForumAiTest {
     }
     @Test void noOptInOrNoLessonNeverInvokesAi() {
         controller.create(user,new ForumController.ThreadRequest(2,"Title","Body",3L,false));
-        controller.create(user,new ForumController.ThreadRequest(2,"Title","Body",null,true));
+        assertThrows(ResponseStatusException.class,()->controller.create(user,new ForumController.ThreadRequest(2,"Title","Body",null,true)));
         verifyNoInteractions(ai);verify(forum,never()).saveAi(any(),anyLong(),anyString(),anyString());
     }
 }

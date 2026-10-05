@@ -17,6 +17,8 @@ public class AiService {
     private final vn.edu.khtn8.content.service.LearningPathService path;
     @org.springframework.beans.factory.annotation.Autowired
     private AiSettingsService runtimeSettings;
+    @org.springframework.beans.factory.annotation.Autowired
+    private vn.edu.khtn8.files.AiAttachmentService attachments;
     public AiService(AppProperties properties, AiProvider provider, LessonService lessons, AiQuotaService quota,
             vn.edu.khtn8.content.service.LearningPathService path) {
         this.properties = properties; this.provider = provider; this.lessons = lessons; this.quota = quota;
@@ -25,6 +27,9 @@ public class AiService {
     public record Answer(String provider, boolean sample, String text, String[] sourceLabels, boolean needsTeacherReview) { }
 
     public Answer ask(AuthenticatedUser user, long lessonId, String question) {
+        return ask(user,lessonId,question,java.util.List.of());
+    }
+    public Answer ask(AuthenticatedUser user,long lessonId,String question,java.util.List<Long> fileIds) {
         SchoolService.require(user, "STUDENT", "PARENT", "TEACHER", "ADMIN");
         if (!(runtimeSettings==null?properties.getAi().isEnabled():runtimeSettings.enabled())) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Trợ giúp AI đang tắt. Hãy hỏi giáo viên hoặc dùng diễn đàn.");
         if(SchoolService.hasRole(user,"STUDENT")) path.requireUnlocked(user.id(),lessonId);
@@ -32,7 +37,9 @@ public class AiService {
         long requestId = quota.reserve(user.id(), provider.providerName());
         try {
             String context="Môn học: "+lesson.subjectName()+"; khối lớp: "+lesson.gradeLevel()+"; bài: "+lesson.title()+"\n"+org.jsoup.Jsoup.parse(lesson.contentHtml()).text();
-            var answer = provider.answer(new AiProvider.AiQuestion(question, context, "HINT"));
+            var files=fileIds.isEmpty()?java.util.List.<AiProvider.Attachment>of():attachments.load(user,fileIds);
+            if(!files.isEmpty() && provider.providerName().equals("stub-local")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"AI mẫu không đọc file. Cấu hình model thật để xử lý đính kèm.");
+            var answer = provider.answer(new AiProvider.AiQuestion(question, context, "HINT",java.util.List.of(),files));
             quota.finish(requestId, true);
             return new Answer(provider.providerName(), provider.providerName().equals("stub-local"), answer.text(), new String[]{lesson.title()}, true);
         } catch (RuntimeException ex) {

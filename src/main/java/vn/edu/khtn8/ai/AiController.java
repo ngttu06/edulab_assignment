@@ -11,9 +11,11 @@ import vn.edu.khtn8.identity.security.AuthenticatedUser;
 public class AiController {
     private final AiService ai;
     public AiController(AiService ai) { this.ai = ai; }
-    public record Question(@Positive long lessonId, @NotBlank @Size(max=2000) String question) { }
+    public record Question(@Positive long lessonId, @NotBlank @Size(max=2000) String question,@Size(max=3) java.util.List<@NotNull @Positive Long> fileIds) {
+        public Question(long lessonId,String question) { this(lessonId,question,java.util.List.of()); }
+    }
     @PostMapping("/questions")
     public AiService.Answer ask(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody Question request) {
-        return ai.ask(user, request.lessonId(), request.question());
+        return ai.ask(user, request.lessonId(), request.question(),request.fileIds()==null?java.util.List.of():request.fileIds());
     }
 }

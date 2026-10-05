@@ -39,6 +39,8 @@ Sau browser smoke, đã chạy lại bộ unit/security/local-MySQL: **65 test �
 
 **Chưa kiểm chứng:** Docker/Testcontainers trong lần xác nhận này, kết nối/migration database remote, HTTPS production, AI thật với API key/model của nhà cung cấp, scanner mã độc, toàn bộ thao tác quản trị/upload qua trình duyệt, tải cao hoặc khả năng truy cập đầy đủ. Browser smoke là một tập luồng đại diện, không phải E2E toàn bộ hệ thống.
 
+Phần trên là kết quả lịch sử ngày 30/09. Các xác nhận mới về AI/R2 và chuyển database cloud ngày 05/10 nằm ở các mục vận hành bên dưới; không suy ra đã triển khai website production.
+
 ## Thiết lập local
 
 Các lệnh bên dưới dùng thư mục workspace tuyệt đối; đổi một lần nếu clone ở nơi khác:
@@ -133,7 +135,51 @@ Spring Boot **không tự đọc `.env`**. `$PROJECT_ROOT/.env.example` và `$PR
 
 ### Upload và AI: giới hạn vận hành
 
-Tệp upload mặc định là **PENDING_SCAN** và không tải xuống được. **Chưa có scanner/queue** hoặc API tự đánh dấu CLEAN; tệp sẽ tiếp tục cách ly. Signature không loại trừ polyglot/PDF độc hại. Không bật scan bypass để phục vụ người dùng thật. Thư mục upload phải nằm ngoài Tomcat webapps, chỉ tài khoản chạy ứng dụng có quyền ghi; chưa có dọn tệp mồ côi hoặc UI xóa upload.
+Tệp upload trực tiếp R2 được kiểm tra metadata, dung lượng thực tế và chữ ký định dạng, rồi quét qua ClamAV INSTREAM nếu operator đã cấu hình. Chưa có ClamAV hoặc scanner lỗi: **PENDING_SCAN**, không tải xuống/gửi AI. Tác vụ thử quét lại mỗi 30 giây; không có API cho client tự đánh dấu CLEAN. Signature và antivirus không chứng minh file hoàn toàn an toàn. Không bật scan bypass để phục vụ người dùng thật. File local cũ vẫn được đọc từ thư mục ngoài webroot; chưa có UI xóa file đã xác nhận hoặc tự dọn file đã xác nhận nhưng không gắn vào câu hỏi.
+
+### Upload trực tiếp S3 / Cloudflare R2 — 05/10/2026
+
+- `/admin` → **Lưu trữ S3 / Cloudflare R2**: bật/tắt upload, endpoint HTTPS, bucket, region, prefix, thay cả hai khóa, giới hạn ảnh/PDF/tài khoản và khả năng ảnh/PDF của AI. Mặc định endpoint R2 của tài khoản đã cung cấp, bucket `edulab`, region `auto`, prefix `edulab`; migration không chứa credentials. `EDULAB_STORAGE_ALLOWED_HOSTS` do operator quản lý, không phải admin tùy ý thêm host. CSP `connect-src` dùng đúng các host trong allowlist.
+- Sinh một lần khóa 32 byte Base64 (`openssl rand -base64 32`) và đặt `EDULAB_STORAGE_ENCRYPTION_KEY` riêng, ổn định qua restart, sao lưu riêng DB. Access/Secret Key lưu AES-256-GCM với domain storage riêng; API GET chỉ trả `keyConfigured`, không trả khóa/ciphertext. Audit không lưu payload. Khi đổi vị trí storage, tạo profile mới và giữ profile cũ cho file cũ; xoay khóa cùng endpoint/bucket cập nhật các profile cùng bucket. Nếu chuyển sang bucket khác, operator vẫn phải duy trì quyền khóa cũ để đọc file cũ.
+- `POST /api/v1/files/presign` nhận `{filename,contentType,size}`; yêu cầu đăng nhập và CSRF. Trả `{uploadId,url,method:"PUT",headers,expiresInSeconds:300}`. Giữ quota theo dung lượng khai báo, khóa hàng user để chống cạnh tranh, tối đa 6 phiên đang chờ và 30 URL/người/giờ. Mặc định ảnh 5 MiB, PDF 10 MiB, 100 MiB/tài khoản; admin được giảm/tăng quota trong giới hạn backend. Ký **Content-Type và Content-Length chính xác**; JS chỉ đặt Content-Type, trình duyệt tự đặt Content-Length cho Blob. Không dùng presigned POST policy (R2 không hỗ trợ HTML form POST).
+- Browser dùng XMLHttpRequest `PUT` raw File **thẳng R2**, có tiến độ/hủy/chọn-bỏ file; không cookie/JWT/CSRF của app, không FormData qua backend. `POST /api/v1/files` cũ trả 410; multipart của Spring bị tắt. Không fallback upload qua server. Presigned URL là bearer token có thể tái sử dụng trước khi hết hạn; không lưu URL ở DB/localStorage/log.
+- `POST /api/v1/files/uploads/{uploadId}/complete` xác nhận phiên chính chủ trong 10 phút, `HEAD` staging, copy **nội bộ R2** sang final key chưa từng cấp PUT cho client, rồi kiểm tra **bản final** (size/MIME/signature/SHA-256/quét). Vì copy-source conditional không được dựa vào để bảo vệ, chỉ bản final đã kiểm chứng được chấp nhận. Complete idempotent, không ghi file/tính quota lần nữa. Truy cập file dùng fileId, không lấy key từ client. `GET .../{uploadId}/status` xem trạng thái, `DELETE .../{uploadId}` hủy phiên đang chờ và giải phóng reservation; hủy không thu hồi ngay URL PUT đã cấp. Tắt storage chỉ chặn URL mới; các URL cũ còn hiệu lực đến hết hạn.
+- Tác vụ dọn staging/phiên kết thúc sau 1 ngày, tối đa 20 phiên/phút; giữ đủ metadata cho rate limit/retry. Khi app không chạy, cleanup không chạy: nên thêm lifecycle chỉ cho prefix `edulab/staging/` (và `edulab/probe/` cho probe bỏ dở), không áp dụng vào `edulab/files/`. URL PUT tái sử dụng vẫn có thể ghi staging trước expiry, nhưng không sửa final key. Object ghi quá hạn mức do client gian lận bị R2 từ chối khi lệch Content-Length đã ký; final còn kiểm tra dung lượng/hash.
+- `EDULAB_CLAMAV_HOST` và `EDULAB_CLAMAV_PORT` (3310) là daemon INSTREAM trên mạng riêng/tin cậy, không phải URL do client chọn; không có TLS trong protocol này. Bỏ host thì fail closed, không tự cài ClamAV hoặc bật bypass. Local-only `EDULAB_DEV_SCAN_BYPASS=true` chỉ dành cho tài liệu mẫu tin cậy; deployment guard từ chối bypass ngoài local-only.
+- File đính kèm tại hỏi AI bài học, tạo câu hỏi và trả lời diễn đàn. Quyền file: chính uploader hoặc thành viên được phép xem thread đã công bố, kể cả attachment ở phần câu hỏi gốc. Thread và attachments ghi atomically; AI lỗi vẫn giữ bài. Tác giả có nút gọi AI lại sau quét. Chat công khai hỗ trợ website không nhận file bài tập. Nội dung/tên file được escape; AI vẫn hiển thị text, không render HTML.
+- AI chỉ nhận file chính chủ, CLEAN, hash khớp, tối đa 3 file và tổng 15 MiB; ảnh dùng OpenAI `image_url` data URL, PDF dùng `file_data` data URL (không chỉ đưa tên/URL). **Đường truyền upload không qua app**; sau upload app vẫn đọc file từ R2 để scan, download và truyền dữ liệu đã kiểm tra tới AI. Model capability phải bật riêng sau kiểm thử; không suy ra từ HTTP 200 hoặc nhãn OpenAI-compatible. Không có PDF OCR/trích xuất fallback và không có thư viện parser PDF mới. Nếu PDF không được model đọc thì upload/lưu/diễn đàn vẫn dùng được, giải bài PDF bị từ chối rõ ràng.
+- Giới hạn còn lại: không có global upload budget/rate limit phân tán cho toàn hệ thống, không có UI quản lý/xóa file đã hoàn tất, không bảo đảm phát hiện mọi malware/polyglot/prompt injection; R2 client được giới hạn các thao tác cần thiết và timeout, không retry/redirect. Cần egress firewall/DNS đáng tin ở production. Bật AI nghĩa là file học sinh được gửi bên thứ ba; cần chính sách quyền riêng tư phù hợp trẻ em.
+
+**CORS local hiện tại** (bucket vẫn private; origin không có `/edulab`):
+
+```json
+[
+  {
+    "AllowedOrigins": ["http://127.0.0.1:8085", "http://localhost:8085"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Cấu hình tại Cloudflare → R2 → `edulab` → Settings → CORS. Đổi cổng/origin thì cập nhật rule; CORS không thay thế authorization và không chặn client ngoài browser. Không cần public bucket hoặc Cloudflare control-plane API Token trong app. Nút kiểm tra storage gửi Blob `OK` trực tiếp từ browser, server HEAD/GET/DELETE đúng object probe riêng; probe lỗi/bỏ dở cần lifecycle dọn riêng.
+
+**Đã xác nhận live:** presigned PUT browser + CORS, HEAD/GET/CopyObject/DeleteObject trên bucket `edulab`; thay Content-Length ký bị R2 trả 403. End-to-end ảnh tự tạo `7 + 5` upload browser → final copy → fixture INSTREAM chỉ chấp nhận hash mẫu → AI model `gpt-6.1-sol` trả `12`; fixture scanner không phải antivirus và đã gỡ sau kiểm thử, scan bypass luôn tắt. Khả năng ảnh bật cho local đã kiểm chứng. PDF mẫu trả HTTP 200 nhưng không xác nhận đọc đúng phép tính, nên **PDF capability vẫn tắt**. Máy local chưa có ClamAV thật: file người dùng tiếp tục cách ly; không tuyên bố quét malware production đã đạt. Khóa dùng cho local lưu mã hóa DB; khóa mã hóa trong `/Users/ngttu/Workspace/project_asm_prj/.tools/ai-preview.env` bị Git ignore. Lần triển khai R2 ban đầu không đổi DB remote; lần chuyển cloud theo yêu cầu riêng ngày 05/10 đã sao chép ciphertext và bổ sung đúng khóa mã hóa vào `.env.remote` riêng tư, xem mục chuyển database cloud.
+
+Kiểm thử cuối: **139 tests, 0 failures/errors/skips** với `clean verify` Java 21 và MySQL demo loopback 3307, loại rõ `MysqlIntegrationTest` (không tuyên bố Docker/Testcontainers đã chạy). Các test mới kiểm tra SigV4/cipher/endpoint, INSTREAM giả lập, CSRF/phân quyền/admin không lộ khóa, migration V14, quota reservation, idempotency, hash, content giả/quá hạn/INFECTED và capability ảnh/PDF. Browser storage đạt sáu kích thước admin (1440/1024/768/640/390/320), lesson/forum 1440/390/320, direct PUT thật và mock retry không upload trùng; chat/auth/profile được kiểm tra lại riêng. Test provider mock không thay thế kết quả live đã nêu.
+
+Browser regression (mock mặc định, không gọi AI thật):
+
+```bash
+EDULAB_PLAYWRIGHT_PATH="$PROJECT_ROOT/.tools/browser/node_modules/playwright" \
+EDULAB_SMOKE_URL='http://127.0.0.1:8085/edulab' \
+node "$PROJECT_ROOT/scripts/browser-storage.cjs"
+# Tùy chọn EDULAB_STORAGE_LIVE_TEST=true upload file mẫu R2 thật; AI vẫn mock,
+# cần DB local dùng thử, scanner tắt; script tạo một file mẫu cách ly, không tự xóa DB/R2.
+```
+
+Migration **V14** cần review/apply trước deploy vào database mới, không bật Flyway startup trên production. Database cloud cụ thể ở mục chuyển database bên dưới đã có history V1–V14 được xác minh; không chạy lại migration hoặc import trên đó. Không có secret trong migration hoặc mẫu env. Các khóa đã gửi trong hội thoại cần rotate; nhập cặp mới ở admin trước khi phục vụ dữ liệu thật.
 
 Khi bật GateCheap, **câu hỏi, tối đa 8 tin nhắn gần nhất và ngữ cảnh công khai liên quan được gửi đến bên thứ ba**; trợ giảng bài học còn gửi nội dung bài đã xuất bản. App không gửi token đăng nhập, API key trong prompt hay chủ động thêm hồ sơ học sinh; người dùng vẫn có thể tự nhập dữ liệu cá nhân. Cần xem xét chính sách cho trẻ em và điều khoản lưu dữ liệu của provider trước khi bật. Bảng quota chỉ lưu metadata; không lưu prompt/câu trả lời. Câu trả lời AI đăng vào diễn đàn vẫn lưu như nội dung diễn đàn. Provider có timeout, không tự retry hoặc theo HTTP redirect để tránh phí lặp/rò khóa. Tests dùng mock HTTP không chứng minh AI thật hoạt động; xác nhận live được ghi riêng.
 
@@ -347,10 +393,10 @@ curl --fail --silent --show-error --output /dev/null 'http://127.0.0.1:8082/edul
 
 ### Remote / production: không tự động migrate
 
-**Chưa kết nối hoặc thay đổi database remote trong lần xác nhận này.** Host mặc định trong profile/mẫu remote không phải đích thử nghiệm và không phải quyền cho phép chạy migration.
+Host mặc định trong profile/mẫu remote không phải quyền cho phép chạy migration. Database cloud bên dưới đã được chuyển theo yêu cầu riêng của chủ sở hữu; không tự áp dụng lại import/migration trên database đó.
 
 - Automatic Flyway chỉ được phép với **profile local-only và datasource loopback**. Base/remote mặc định tắt Flyway; guard từ chối bật startup migration ngoài local, kể cả khi bị override. Hibernate dùng `ddl-auto=validate`, không tự tạo schema.
-- DBA cần review và chạy riêng 12 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
+- Với database mới, DBA cần review và chạy riêng 14 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
 - Ngoài local, app từ chối startup nếu còn tài khoản enabled mang hash demo. DBA phải đặt hash BCrypt riêng cho admin, đổi mật khẩu/disable các tài khoản demo, tăng `auth_version` và thu hồi refresh sessions liên quan. Đây không thay thế audit mật khẩu và quyền tài khoản đầy đủ.
 - Cấu hình rõ URL/user/password được duyệt; URL bắt buộc `sslMode=VERIFY_IDENTITY`, CA/truststore đúng. Không dùng public-key retrieval hoặc bỏ kiểm tra TLS cho remote. Dùng tài khoản ứng dụng quyền tối thiểu, tách tài khoản migration có DDL.
 - Bắt buộc HTTPS, secure cookies, reverse proxy/connector được harden, upload riêng ngoài webroot. Không dùng profile local hoặc scan bypass ở server phục vụ người dùng. Gỡ/khóa ứng dụng manager/examples mặc định của Tomcat khi triển khai thật.
@@ -359,10 +405,22 @@ curl --fail --silent --show-error --output /dev/null 'http://127.0.0.1:8082/edul
 
 `$PROJECT_ROOT/run-remote.sh` chạy WAR bằng embedded Tomcat với profile remote, không build hoặc migrate giúp bạn. Nó đọc `.env.remote` nếu có, yêu cầu DB password/JWT secret; khóa AI được nhập ở admin, khóa mã hóa đặt ở môi trường server. Chỉ dùng sau khi hoàn tất các bước duyệt triển khai; kiểm tra WAR không cũ. Với Tomcat ngoài, cấu hình cùng các biến qua service manager và deploy thủ công, không chạy script này song song.
 
+### Chuyển database cloud đã xác nhận — 05/10/2026
+
+- Đích được chủ sở hữu yêu cầu: `mysql.ngttu.com:3306/edulab_assignment`, user MySQL `ngttu`. Đích trống trước import; không ghi đè hay hợp nhất ID với dữ liệu đã có. Nguồn là `127.0.0.1:3307/edulab_test`, được sao lưu khi preview tạm dừng rồi phục hồi thử trên database staging local.
+- Snapshot cloud-ready có **40 bảng, 266 dòng**, schema và SHA-256 toàn bộ dữ liệu từng bảng khớp sau import, kiểm tra khóa ngoại không có orphan và `CHECK TABLE` đạt. Flyway **chỉ validate** history/checksum V1–V14, không migrate/repair/baseline. Một lần mất kết nối ở bước đối chiếu được khắc phục bằng tiếp tục kiểm tra read-only, không import lại.
+- TLS xác minh CA/hostname thành công ở cả MySQL CLI (`VERIFY_IDENTITY` + CA bundle) và Java Connector/J (`sslMode=VERIFY_IDENTITY`); không bật public-key retrieval hoặc hạ chế độ TLS trên cloud. JDBC xác nhận cipher `TLS_AES_256_GCM_SHA384`.
+- Theo lựa chọn của chủ sở hữu, tài khoản web `ngttu` giữ nguyên; admin có mật khẩu mới ngẫu nhiên, BCrypt cost 12. **9 tài khoản demo/smoke-test bị khóa**, tăng `auth_version`, thu hồi toàn bộ refresh session cũ. Giữ dữ liệu học tập/diễn đàn và các quan hệ hiện có, kể cả nội dung kiểm thử; đây không phải database production đã làm sạch nội dung.
+- Mật khẩu admin mới chỉ lưu tại `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-admin-credentials.json` quyền **0600**. Mật khẩu MySQL khác mật khẩu đăng nhập web. Không hiển thị mật khẩu trong README/log hoặc commit file credentials.
+- `/Users/ngttu/Workspace/project_asm_prj/.env.remote` quyền **0600**, bị Git ignore, đã đặt datasource cloud/profile remote, secure cookies, scan bypass false và đúng khóa mã hóa AI/R2. Đã kiểm chứng giải mã ciphertext trên cloud. Sao lưu riêng khóa mã hóa; mất chúng sẽ không đọc được khóa provider/storage trong DB.
+- HTTPS smoke **chỉ trên loopback**, WAR/profile remote kết nối DB cloud: đăng nhập admin mới, Secure/HttpOnly cookies, CSRF, chặn tài khoản demo đã khóa, metadata AI/R2 không lộ khóa, tám trang chính, admin 390 px không tràn ngang; file `PENDING_SCAN` vẫn trả 404. Không gọi AI thật hoặc upload file mới trong lượt smoke cloud. Phiên kiểm tra được dừng sau khi hoàn tất; không triển khai website lên máy chủ công khai.
+- Backup/dump/manifest/report riêng tư tại `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-db-backups/20261005T050845Z/`; report ghi trạng thái snapshot trước smoke, login/logout sau đó tạo/thu hồi phiên mới. Giữ bản local, không sửa dữ liệu nguồn để chuyển cloud. Preview cổng 8085 vẫn dùng DB local; **không có đồng bộ hai chiều hoặc tự merge thay đổi sau snapshot**.
+- Trước phục vụ thật: rotate mật khẩu MySQL và khóa đã gửi trong hội thoại; cập nhật secret runtime tương ứng; tách user ứng dụng quyền tối thiểu khỏi tài khoản có DDL; cấu hình HTTPS công khai, exact production CORS/allowlist, lifecycle staging/probe và ClamAV thật. R2 vẫn bật, khả năng ảnh bật, PDF tắt; không có ClamAV thì file người dùng vẫn cách ly. Chuyển DB không thay thế cấu hình hay kiểm thử deployment production.
+
 ## Cấu trúc và giới hạn còn lại
 
 - `$PROJECT_ROOT/src/main/java/vn/edu/khtn8`: identity/security, content, assessment, school, community/files, administration, AI và deployment guards.
-- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V12; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
+- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V14; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
 - `$PROJECT_ROOT/src/main/webapp/WEB-INF/jsp`: JSP views; `$PROJECT_ROOT/src/test/java`: unit, security và workflow tests.
 - `$PROJECT_ROOT/scripts/browser-smoke.cjs`: smoke test trình duyệt local-only; `$PROJECT_ROOT/.tools`: công cụ/ảnh/upload local bị Git ignore.
 

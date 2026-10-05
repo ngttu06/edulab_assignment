@@ -39,7 +39,7 @@ const out = process.env.EDULAB_SCREENSHOT_DIR || '.tools/screenshots';
     await page.screenshot({path:out+'/family.png',fullPage:true});
     const lessons=await api('/api/v1/lessons');assert.ok(lessons.length>=3);
     await navigate('/lessons/'+lessons[0].id);
-    await page.locator('#aiQuestion').fill('Hãy giải thích một ví dụ.');await page.locator('#aiForm button').click();
+    await page.locator('#aiQuestion').fill('Hãy giải thích một ví dụ.');await page.locator('#aiForm button[type=submit]').click();
     await page.waitForFunction(()=>document.getElementById('aiAnswer').textContent.includes('đang tắt'));
     await page.screenshot({path:out+'/lesson.png',fullPage:true});
     const quizzes=await api('/api/v1/quizzes');

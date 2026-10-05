@@ -10,18 +10,32 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import vn.edu.khtn8.identity.security.AuthenticatedUser;
 
 @RestController
 @RequestMapping("/api/v1/files")
 public class FileController {
     private final FileService files;
-    public FileController(FileService files) { this.files = files; }
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Map<String, Object> upload(@AuthenticationPrincipal AuthenticatedUser user, @RequestParam MultipartFile file) throws IOException {
-        return files.upload(user, file);
+    private final DirectUploadService uploads;
+    public FileController(FileService files,DirectUploadService uploads) { this.files = files;this.uploads=uploads; }
+    @PostMapping
+    public Map<String, Object> upload(@AuthenticationPrincipal AuthenticatedUser user) {
+        throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.GONE,"Upload qua server đã ngừng. Dùng presigned URL để upload trực tiếp R2.");
     }
+    @PostMapping("/presign")
+    public DirectUploadService.Ticket presign(@AuthenticationPrincipal AuthenticatedUser user,@jakarta.validation.Valid @RequestBody DirectUploadService.Input input,
+            jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL,"no-store");return uploads.presign(user,input);
+    }
+    @PostMapping("/uploads/{id}/complete")
+    public DirectUploadService.Status complete(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String id) { return uploads.complete(user,id); }
+    @GetMapping("/uploads/{id}/status")
+    public DirectUploadService.Status status(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String id,
+            jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL,"no-store");return uploads.status(user,id);
+    }
+    @DeleteMapping("/uploads/{id}")
+    public DirectUploadService.Status cancel(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String id) { return uploads.cancel(user,id); }
     @GetMapping("/{id}")
     public ResponseEntity<Resource> download(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) throws IOException {
         var download = files.download(user, id);

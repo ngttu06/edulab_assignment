@@ -28,6 +28,7 @@ spring:
     baseline-on-migrate: false
   servlet:
     multipart:
+      enabled: false
       max-file-size: 10MB
       max-request-size: 11MB
   mvc:

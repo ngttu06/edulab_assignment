@@ -42,6 +42,7 @@ public class ForumService {
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy thảo luận.");
         var thread = rows.getFirst();
         categoryAccess(user, ((Number)thread.get("category_id")).longValue());
+        thread.put("files",jdbc.queryForList("SELECT f.id,f.original_filename,f.scan_status FROM forum_thread_attachments a JOIN stored_files f ON f.id=a.stored_file_id WHERE a.thread_id=?",id));
         return thread;
     }
     public List<Map<String, Object>> posts(AuthenticatedUser user, long threadId, int page) {
@@ -55,6 +56,20 @@ public class ForumService {
     public long create(AuthenticatedUser user, long categoryId, String title, String body) {
         categoryAccess(user, categoryId);
         return insert("INSERT INTO forum_threads(category_id,author_id,title,body) VALUES(?,?,?,?)", categoryId, user.id(), title.trim(), body.trim());
+    }
+    @Transactional
+    public long create(AuthenticatedUser user,long categoryId,String title,String body,Long lessonId,List<Long> fileIds) {
+        long id=create(user,categoryId,title,body);
+        jdbc.update("UPDATE forum_threads SET ai_lesson_id=? WHERE id=?",lessonId,id);
+        for(long fileId:fileIds.stream().distinct().toList()) {
+            requireOwnAttachment(user,fileId);
+            jdbc.update("INSERT INTO forum_thread_attachments(thread_id,stored_file_id) VALUES(?,?)",id,fileId);
+        }
+        return id;
+    }
+    private void requireOwnAttachment(AuthenticatedUser user,long fileId) {
+        if(jdbc.queryForList("SELECT id FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status IN ('CLEAN','PENDING_SCAN') FOR UPDATE",fileId,user.id()).isEmpty())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Tệp đính kèm không hợp lệ.");
     }
     @Transactional
     public long reply(AuthenticatedUser user, long threadId, String body, List<Long> fileIds) {
@@ -87,7 +102,9 @@ public class ForumService {
         var threads = jdbc.queryForList("""
                 SELECT t.id FROM forum_post_attachments a JOIN forum_posts p ON p.id=a.forum_post_id
                 JOIN forum_threads t ON t.id=p.thread_id WHERE a.stored_file_id=? AND p.status='PUBLISHED' AND t.status IN ('PUBLISHED','LOCKED')
-                """, Long.class, fileId);
+                UNION SELECT t.id FROM forum_thread_attachments a JOIN forum_threads t ON t.id=a.thread_id
+                WHERE a.stored_file_id=? AND t.status IN ('PUBLISHED','LOCKED')
+                """, Long.class, fileId,fileId);
         for (long id : threads) {
             try { thread(user, id); return true; }
             catch (ResponseStatusException ignored) { }

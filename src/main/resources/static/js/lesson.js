@@ -1,11 +1,13 @@
+const lessonUploads = document.getElementById('aiForm') ? window.edulabUploads.attach('aiFiles','aiUploadStatus','aiUploadCancel') : null;
 document.getElementById('aiForm')?.addEventListener('submit', async event => {
     event.preventDefault();
-    const form = event.currentTarget, button = form.querySelector('button');
+    const form = event.currentTarget, button = form.querySelector('button[type=submit]');
     button.disabled = true;
     document.getElementById('aiAnswer').textContent = 'Trợ lý đang chuẩn bị hướng dẫn...';
     try {
+        const fileIds=await lessonUploads.upload();
         const answer = await window.edulab.api('/api/v1/ai/questions', {method: 'POST', body: {
-            lessonId: Number(form.dataset.id), question: document.getElementById('aiQuestion').value
+            lessonId: Number(form.dataset.id), question: document.getElementById('aiQuestion').value,fileIds
         }});
         document.getElementById('aiAnswer').textContent = (answer.sample ? 'AI MẪU — ' : 'AI HỖ TRỢ — ') + answer.text + '\n\nTài liệu tham khảo: ' + answer.sourceLabels.join(', ') + '. Cần giáo viên kiểm tra.';
     } catch (error) { document.getElementById('aiAnswer').textContent = error.message; }

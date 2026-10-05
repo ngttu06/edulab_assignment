@@ -31,7 +31,9 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter,
                                             WebAuthenticationEntryPoint entryPoint,
                                             com.fasterxml.jackson.databind.ObjectMapper json,
-                                            vn.edu.khtn8.common.config.AppProperties properties) throws Exception {
+                                            vn.edu.khtn8.common.config.AppProperties properties,
+                                            @org.springframework.beans.factory.annotation.Value("${EDULAB_STORAGE_ALLOWED_HOSTS:c9da795e23235545fa54e8c7ee61d3cf.r2.cloudflarestorage.com}") String storageHosts) throws Exception {
+        var storageEndpoints=new vn.edu.khtn8.files.StorageEndpointPolicy(storageHosts);
         CookieCsrfTokenRepository csrf = new CookieCsrfTokenRepository();
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(properties.getCookie().isSecure()).sameSite("Strict"));
         http
@@ -61,7 +63,7 @@ public class SecurityConfig {
                             }
                         }))
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; connect-src 'self' "+storageEndpoints.cspSources()+"; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"))
                         .contentTypeOptions(contentTypeOptions -> {})
                         .frameOptions(frame -> frame.deny())
                         .referrerPolicy(referrer -> referrer.policy(

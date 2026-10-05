@@ -79,4 +79,14 @@ class GateCheapAiProviderTest {
                 .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"OK\"}}]}",MediaType.APPLICATION_JSON));
         active.answer(question);active.answer(question);mockServer.verify();
     }
+    @Test void imageAndPdfAreMultimodalInputsNotMerelyFilenames() {
+        server.expect(anything()).andExpect(jsonPath("$.messages[2].content[0].type").value("text"))
+                .andExpect(jsonPath("$.messages[2].content[1].image_url.url").value("data:image/png;base64,AAAA"))
+                .andExpect(jsonPath("$.messages[2].content[2].file.file_data").value("data:application/pdf;base64,BBBB"))
+                .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"Đã đọc bài\"}}]}",MediaType.APPLICATION_JSON));
+        var result=provider.answer(new AiProvider.AiQuestion("Giải bài","Bài học","HINT",java.util.List.of(),java.util.List.of(
+                new AiProvider.Attachment("exercise.png","image/png","data:image/png;base64,AAAA"),
+                new AiProvider.Attachment("exercise.pdf","application/pdf","data:application/pdf;base64,BBBB"))));
+        assertEquals("Đã đọc bài",result.text());server.verify();
+    }
 }

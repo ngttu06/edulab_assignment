@@ -15,6 +15,8 @@ public class AiService {
     private final LessonService lessons;
     private final AiQuotaService quota;
     private final vn.edu.khtn8.content.service.LearningPathService path;
+    @org.springframework.beans.factory.annotation.Autowired
+    private AiSettingsService runtimeSettings;
     public AiService(AppProperties properties, AiProvider provider, LessonService lessons, AiQuotaService quota,
             vn.edu.khtn8.content.service.LearningPathService path) {
         this.properties = properties; this.provider = provider; this.lessons = lessons; this.quota = quota;
@@ -24,7 +26,7 @@ public class AiService {
 
     public Answer ask(AuthenticatedUser user, long lessonId, String question) {
         SchoolService.require(user, "STUDENT", "PARENT", "TEACHER", "ADMIN");
-        if (!properties.getAi().isEnabled()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Trợ giúp AI đang tắt. Hãy hỏi giáo viên hoặc dùng diễn đàn.");
+        if (!(runtimeSettings==null?properties.getAi().isEnabled():runtimeSettings.enabled())) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Trợ giúp AI đang tắt. Hãy hỏi giáo viên hoặc dùng diễn đàn.");
         if(SchoolService.hasRole(user,"STUDENT")) path.requireUnlocked(user.id(),lessonId);
         var lesson = lessons.detail(user.id(), lessonId);
         long requestId = quota.reserve(user.id(), provider.providerName());

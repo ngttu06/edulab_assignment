@@ -10,9 +10,7 @@ fi
 export SPRING_PROFILES_ACTIVE=remote
 : "${EDULAB_DB_PASSWORD:?Configure EDULAB_DB_PASSWORD}"
 : "${EDULAB_JWT_SECRET:?Configure EDULAB_JWT_SECRET}"
-if [[ "${EDULAB_AI_ENABLED:-false}" == true ]]; then
-    : "${EDULAB_AI_API_KEY:?Configure EDULAB_AI_API_KEY}"
-fi
+# AI credentials are configured in the admin panel; encryption key stays on the server.
 if [[ ! -f target/edulab-khtn8.war ]]; then
     printf '%s\n' 'Build the WAR with JDK 21 and mvn clean verify first.' >&2
     exit 1

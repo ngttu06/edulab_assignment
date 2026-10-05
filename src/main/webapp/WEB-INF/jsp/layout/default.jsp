@@ -12,7 +12,9 @@
     <link href="${pageContext.request.contextPath}/css/vendor/bootstrap.min.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/fonts.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/edulab.css" rel="stylesheet">
+    <link href="${pageContext.request.contextPath}/css/ai-chat.css" rel="stylesheet">
     <script src="${pageContext.request.contextPath}/js/app.js" defer></script>
+    <script src="${pageContext.request.contextPath}/js/ai-chat.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
@@ -31,6 +33,7 @@
         </nav>
         <div class="sidebar-section"><h2>Không gian của bạn</h2><nav class="side-links" aria-label="Không gian cá nhân">
             <a data-nav href="${pageContext.request.contextPath}/dashboard"><span class="nav-icon"><ui:icon name="chart"/></span>Tổng quan học tập</a>
+            <c:if test="${not empty pageContext.request.userPrincipal}"><a data-nav href="${pageContext.request.contextPath}/profile"><span class="nav-icon"><ui:icon name="user"/></span>Thông tin cá nhân</a></c:if>
             <c:if test="${pageContext.request.isUserInRole('TEACHER') or pageContext.request.isUserInRole('ADMIN')}"><a data-nav href="${pageContext.request.contextPath}/teacher/classes"><span class="nav-icon"><ui:icon name="users"/></span>Quản lý lớp học</a></c:if>
             <c:if test="${pageContext.request.isUserInRole('STUDENT') or pageContext.request.isUserInRole('PARENT')}"><a data-nav href="${pageContext.request.contextPath}/family"><span class="nav-icon"><ui:icon name="users"/></span>Kết nối gia đình</a></c:if>
             <c:if test="${pageContext.request.isUserInRole('ADMIN')}"><a data-nav href="${pageContext.request.contextPath}/admin"><span class="nav-icon"><ui:icon name="settings"/></span>Quản trị hệ thống</a></c:if>
@@ -43,5 +46,6 @@
     <c:if test="${discovery}"><jsp:include page="/WEB-INF/jsp/layout/utilities.jsp"/></c:if>
 </div>
 <jsp:include page="/WEB-INF/jsp/layout/footer.jsp"/>
+<jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/>
 </body>
 </html>

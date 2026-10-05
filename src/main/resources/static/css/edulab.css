@@ -120,3 +120,32 @@ progress { display: block; width: 100%; height: 7px; border: 0; border-radius: 8
     .auth-page .header-shortcuts { order: 3; }
     .auth-page { padding-top: 0; }
 }
+
+/* Personal account: shared theme, independent forms, mobile-first reading order. */
+.profile-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; padding: 24px; background: var(--soft-blue); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 24px; }
+.profile-avatar { display: grid; place-items: center; width: 64px; height: 64px; flex: 0 0 auto; color: var(--primary); background: var(--surface); border-radius: 50%; }
+.profile-avatar .icon { width: 30px; height: 30px; }
+.profile-summary>div { flex: 1; min-width: 0; }
+.profile-summary h2 { margin: 0 0 4px; }
+.profile-summary p { color: var(--muted); margin: 0; }
+.profile-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; align-items: start; }
+.profile-panel { padding: 28px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.profile-panel-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.profile-panel-heading h2 { margin: 0 0 4px; }
+.profile-panel-heading p { color: var(--muted); font-size: 12px; margin: 0; }
+.profile-field { margin-bottom: 20px; }
+.profile-panel .form-control[readonly] { background: #edf0f4; color: var(--muted); }
+.profile-panel .form-text { color: var(--muted); font-size: 12px; margin-bottom: 0; }
+.profile-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.profile-show-password { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.profile-show-password .form-check-input { margin: 0; }
+.profile-security-note { display: flex; align-items: start; gap: 10px; padding: 14px; margin: 12px 0 20px; font-size: 12px; color: var(--muted); background: var(--canvas); border-radius: 8px; }
+.profile-security-note .icon { width: 18px; height: 18px; margin-top: 2px; }
+@media (max-width: 1199px) { .profile-grid { grid-template-columns: 1fr; } }
+@media (max-width: 639px) {
+    .profile-panel, .profile-summary { padding: 20px 16px; }
+    .profile-summary { gap: 12px; }
+    .profile-summary>.btn { width: 100%; }
+    .profile-avatar { width: 48px; height: 48px; }
+    .profile-grid { gap: 16px; }
+}

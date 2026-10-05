@@ -14,6 +14,7 @@
     <h1>Đăng nhập</h1>
     <p>Tiếp tục lộ trình học của bạn.</p>
     <div id="error" role="alert" class="alert alert-danger d-none"></div>
+    <div id="loginNotice" role="status" class="alert alert-success d-none"></div>
     <form id="loginForm">
         <label for="username" class="form-label">Tên đăng nhập</label>
         <input id="username" class="form-control mb-3" required maxlength="80" autocomplete="username">

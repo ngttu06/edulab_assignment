@@ -8,6 +8,7 @@ Website học tập EduLab, khởi đầu với Khoa học tự nhiên lớp 8 v
 
 - **Danh mục khóa học:** trang chủ và `/courses` dùng môn học, khối lớp, số bài, thời lượng và tiến độ từ database; tìm kiếm và lọc theo môn/khối/khóa. Chi tiết khóa học hiển thị chương trình, trạng thái và bài tiên quyết. Không dựng giá bán, đánh giá, thống kê hoặc giáo viên giả.
 - **Tài khoản và phân quyền:** ADMIN, TEACHER, STUDENT, PARENT; đăng ký học sinh/phụ huynh; admin tạo tài khoản và bật/tắt tài khoản. JWT access token 15 phút trong cookie HttpOnly; refresh token ngẫu nhiên, lưu hash SHA-256, thời hạn mặc định 14 ngày và xoay vòng khi dùng. Phát hiện dùng lại refresh token sẽ thu hồi token family liên quan và vô hiệu access token hiện tại của tài khoản. Logout thu hồi mọi phiên của tài khoản, không chỉ thiết bị hiện tại.
+- **Thông tin cá nhân:** `/profile` cho mọi vai trò đã đăng nhập; sửa họ tên/email, giữ nguyên tên đăng nhập/vai trò. Email không được trùng tài khoản khác. Đổi mật khẩu cần mật khẩu hiện tại và xác nhận mật khẩu mới; tối thiểu 8 ký tự, tối đa 72 byte UTF-8, không được dùng lại mật khẩu hiện tại. Mật khẩu được băm BCrypt; đổi thành công thu hồi mọi access/refresh session, xóa cookie và yêu cầu đăng nhập lại. Chưa có xác minh email, ảnh đại diện hoặc các trường cá nhân bổ sung.
 - **Bảo vệ request:** CSRF cho thao tác thay đổi dữ liệu, kể cả login/register/refresh; lấy token qua `/api/v1/auth/csrf`. Token đăng nhập không trả trong JSON hoặc lưu trong browser storage. Có giới hạn đăng nhập trong bộ nhớ của từng instance.
 - **Bài học và lộ trình:** bài đã xuất bản, HTML được lọc, mục tiêu học tập, tiến độ riêng và dashboard lấy dữ liệu thật. Bài tiên quyết có thể yêu cầu hoàn thành và đạt điểm quiz tối thiểu; kiểm tra quyền mở bài ở server. Admin tạo và xuất bản bài học, câu hỏi trắc nghiệm, quiz.
 - **Quiz:** PRACTICE và TEST; snapshot câu hỏi/đáp án khi bắt đầu, giới hạn lượt, tiếp tục bài đang làm, tự lưu và khôi phục câu trả lời. Server chấm điểm có trọng số trên thang 10. Khi hết giờ, chỉ chấm câu trả lời đã lưu; không nhận đáp án mới từ request nộp muộn. Nộp lại trả kết quả đã lưu. PRACTICE công bố đáp án sau chấm; TEST còn phải chờ lịch công bố. Có tác vụ hoàn tất bài hết giờ.
@@ -68,7 +69,7 @@ export EDULAB_DB_URL='jdbc:mysql://127.0.0.1:3307/edulab_test?sslMode=DISABLED&a
 export EDULAB_DB_USERNAME=edulab_test
 export EDULAB_DB_PASSWORD=local-test-only-password
 export EDULAB_JWT_SECRET="$(openssl rand -base64 48)"
-export EDULAB_AI_ENABLED=false
+# AI mặc định tắt ở ai_settings; biến EDULAB_AI_ENABLED cũ không còn tác dụng.
 export EDULAB_AI_PROVIDER=gatecheap
 export EDULAB_DEV_SCAN_BYPASS=false
 export EDULAB_UPLOAD_ROOT="$PROJECT_ROOT/.tools/test-uploads"
@@ -100,7 +101,7 @@ URL mặc định của script: `http://127.0.0.1:8080/edulab/`. Không dùng pr
 
 ### Dữ liệu demo
 
-Flyway V1–V12 tạo schema, lớp 8A1, năm học 2026–2027, nội dung KHTN 8 cùng các khóa khởi động Toán, Ngữ văn, Tiếng Anh lớp 8 và Toán, Tiếng Anh lớp 10. Nội dung này là mẫu, không bao phủ toàn bộ chương trình các môn.
+Flyway V1–V13 tạo schema, cấu hình AI mặc định tắt, lớp 8A1, năm học 2026–2027, nội dung KHTN 8 cùng các khóa khởi động Toán, Ngữ văn, Tiếng Anh lớp 8 và Toán, Tiếng Anh lớp 10. Nội dung này là mẫu, không bao phủ toàn bộ chương trình các môn.
 
 | Đăng nhập | Vai trò |
 |---|---|
@@ -126,19 +127,50 @@ Spring Boot **không tự đọc `.env`**. `$PROJECT_ROOT/.env.example` và `$PR
 | `EDULAB_COOKIE_SAME_SITE` | `Lax` mặc định; chỉ chấp nhận `Lax` hoặc `Strict` |
 | `EDULAB_UPLOAD_ROOT` | Mặc định `./storage` theo working directory; nên đặt đường dẫn tuyệt đối ngoài webroot |
 | `EDULAB_DEV_SCAN_BYPASS` | false; chỉ có thể bật trong local-only với tệp thử tin cậy |
-| `EDULAB_AI_ENABLED` | false mặc định; mẫu remote bật true nên cần chủ động tắt nếu chưa cấu hình AI |
 | `EDULAB_AI_PROVIDER` | `gatecheap` mặc định; `stub` chỉ được phép local-only |
-| `EDULAB_AI_BASE_URL` | `https://gatecheap.vn/v1`; phải là endpoint HTTPS đáng tin, không kèm credentials/query/fragment |
-| `EDULAB_AI_MODEL` | `gpt-6-astra` là tên cấu hình mặc định, **chưa xác nhận model này khả dụng trên tài khoản provider** |
-| `EDULAB_AI_API_KEY` | Bắt buộc nếu bật provider thật; chỉ cấu hình phía server |
-| `EDULAB_AI_MAX_OUTPUT_TOKENS` | 1000, cho phép 100–4000 |
-| `EDULAB_AI_DAILY_REQUEST_LIMIT` | 20 mỗi 24 giờ, cho phép 1–100 |
+| `EDULAB_AI_ENCRYPTION_KEY` | Base64 của 32 byte ngẫu nhiên, dùng AES-256-GCM mã hóa khóa AI và HMAC định danh quota. Sinh **một lần**, giữ ổn định và backup riêng khỏi DB |
+| `EDULAB_AI_ALLOWED_HOSTS` | Danh sách host chính xác, phân cách dấu phẩy; mặc định `gatecheap.vn`. Chỉ operator sửa allowlist, không có trong admin API |
 
 ### Upload và AI: giới hạn vận hành
 
 Tệp upload mặc định là **PENDING_SCAN** và không tải xuống được. **Chưa có scanner/queue** hoặc API tự đánh dấu CLEAN; tệp sẽ tiếp tục cách ly. Signature không loại trừ polyglot/PDF độc hại. Không bật scan bypass để phục vụ người dùng thật. Thư mục upload phải nằm ngoài Tomcat webapps, chỉ tài khoản chạy ứng dụng có quyền ghi; chưa có dọn tệp mồ côi hoặc UI xóa upload.
 
-Khi bật GateCheap, **câu hỏi và nội dung bài liên quan được gửi đến bên thứ ba**. App không gửi token đăng nhập hay chủ động thêm hồ sơ học sinh; người dùng vẫn có thể nhập dữ liệu cá nhân vào câu hỏi. Cần thông báo quyền riêng tư, chính sách cho trẻ em và xem xét điều khoản lưu dữ liệu của provider trước khi bật. Bảng quota lưu metadata, không lưu prompt/câu trả lời; câu trả lời AI đăng vào diễn đàn được lưu như nội dung diễn đàn. Provider có timeout, không tự retry để tránh phát sinh phí lặp. Unit tests dùng mock HTTP, không chứng minh tích hợp AI thật hoạt động. Homepage chỉ liên kết tới trợ lý trong bài học, không giả lập phản hồi AI trực tiếp.
+Khi bật GateCheap, **câu hỏi, tối đa 8 tin nhắn gần nhất và ngữ cảnh công khai liên quan được gửi đến bên thứ ba**; trợ giảng bài học còn gửi nội dung bài đã xuất bản. App không gửi token đăng nhập, API key trong prompt hay chủ động thêm hồ sơ học sinh; người dùng vẫn có thể tự nhập dữ liệu cá nhân. Cần xem xét chính sách cho trẻ em và điều khoản lưu dữ liệu của provider trước khi bật. Bảng quota chỉ lưu metadata; không lưu prompt/câu trả lời. Câu trả lời AI đăng vào diễn đàn vẫn lưu như nội dung diễn đàn. Provider có timeout, không tự retry hoặc theo HTTP redirect để tránh phí lặp/rò khóa. Tests dùng mock HTTP không chứng minh AI thật hoạt động; xác nhận live được ghi riêng.
+
+### Chat AI và cấu hình quản trị
+
+- Nút **Hỏi AI** ở góc dưới phải trong cả layout học tập và đăng nhập/đăng ký. Native dialog hỗ trợ focus, Tab/Escape, đóng/mở, câu hỏi gợi ý, lịch sử giới hạn trong bộ nhớ trang, trạng thái đang chờ/lỗi và cuộc trò chuyện mới. Không lưu chat vào localStorage/sessionStorage hoặc DB; tải lại trang sẽ bắt đầu lại.
+- Khách chưa đăng nhập dùng được `GET /api/v1/ai/support/status` và `POST /api/v1/ai/support/chat`; POST vẫn yêu cầu CSRF. Các endpoint AI bài học còn lại vẫn yêu cầu đăng nhập.
+- Trợ lý hỗ trợ chức năng website, tư vấn khóa có trong DB và tạo nút tới danh mục/chi tiết khóa. Chỉ lấy các cột công khai, không lấy progress/hồ sơ/nội dung nháp. Website **chưa có giá, đơn hàng hay thanh toán**; trợ lý không tự mua hoặc cấp quyền. Không dựa vào AI để đưa ra quyết định thanh toán.
+- `/admin` → **Cấu hình trợ lý AI**: bật/tắt, Base URL, model, API key mới/xóa khóa, hạn mức/người và tổng/ngày, output tokens, nút kiểm tra kết nối đã lưu (một request thật có thể phát sinh phí). Các thay đổi áp dụng ngay cho yêu cầu tiếp theo, bao gồm trợ giảng trong bài học.
+- Flyway **V13** thêm `ai_settings` (mặc định tắt, host `https://gatecheap.vn/v1`, model `gpt-6.1-sol`) và `support_ai_requests`. Không sửa các migration cũ. Remote/prod cần migrate có duyệt trước khi deploy, không tự chạy startup migration.
+- API key chỉ lưu AES-256-GCM; GET admin chỉ trả `keyConfigured`, không trả key/ciphertext. Audit chỉ ghi người/thao tác, không ghi payload. Đổi host khi còn khóa cần khóa mới hoặc xóa khóa cũ. Host phải HTTPS, không credentials/query/fragment, nằm trong allowlist và không phân giải về mạng nội bộ. Không dùng allowlist cho host không đáng tin; triển khai thật cần thêm egress firewall/DNS an toàn.
+- Sinh khóa mã hóa riêng bằng `openssl rand -base64 32`, export `EDULAB_AI_ENCRYPTION_KEY` ở service manager/shell rồi khởi động. Không sinh lại mỗi restart; mất/đổi khóa sẽ không đọc được API key cũ, cần nhập lại từ admin. **Không commit khóa**. Các biến legacy `EDULAB_AI_ENABLED/BASE_URL/API_KEY/MODEL/MAX_OUTPUT_TOKENS/DAILY_REQUEST_LIMIT` không còn điều khiển runtime; phải cấu hình qua admin.
+- Chat công khai mặc định 20 lượt/người **hoặc IP**/ngày, tổng 200/ngày (00:00 UTC), 5 lượt/phút/IP, tối đa 4 request đang chờ. Lượt lỗi cũng tính. Database lock giữ budget reservation giữa các instance; IP/guest/user được HMAC và đổi định danh theo ngày. Cookie khách là HttpOnly/SameSite Strict. Metadata cũ hơn 2 ngày được dọn hàng giờ. Trợ giảng bài học vẫn dùng quota riêng trong 24 giờ; chặn AI khi tài khoản đang làm TEST. Client khách ẩn danh không thể được liên kết chắc chắn với bài TEST của một tài khoản khác.
+- Mọi connection của pool đặt MySQL session `time_zone='+00:00'`; ngày HMAC và mốc quota cùng lấy từ database, không phụ thuộc múi giờ JVM. Giới hạn phút/IP cũng làm mới khi định danh ngày đổi lúc 00:00 UTC; giới hạn request đang chờ vẫn dùng metadata toàn cục. Không đổi session time zone ngoài cấu hình pool.
+- Dùng `request.getRemoteAddr()`, không tin `X-Forwarded-For` tùy ý. Khi chạy sau proxy, operator cần cấu hình trusted proxy ở container; nếu không, các khách chung IP proxy sẽ chia hạn mức. Global budget ở đây dành cho chat hỗ trợ và test kết nối, không gộp quota trợ giảng bài học.
+
+Browser regression local (mặc định mock, không gọi provider):
+
+```bash
+EDULAB_SMOKE_URL='http://127.0.0.1:8085/edulab' \
+EDULAB_PLAYWRIGHT_PATH="$PROJECT_ROOT/.tools/browser/node_modules/playwright" \
+EDULAB_SCREENSHOT_DIR="$PROJECT_ROOT/.tools/screenshots/ai" \
+node "$PROJECT_ROOT/scripts/browser-ai.cjs"
+```
+
+Chỉ chạy trên DB demo loopback đã xác nhận. Script đăng nhập admin/học sinh demo, lưu lại cấu hình hiện tại và ghi audit; không xóa audit. Phần lesson/forum mock câu trả lời bài học, tạm tắt AI để kiểm tra API 503 và đăng thảo luận vẫn thành công, rồi khôi phục cấu hình trong `finally`. Thảo luận thử được giữ lại và script in ID để dọn riêng. Không chạy đồng thời script này với quản trị viên đang sửa cấu hình hoặc test dùng cùng tài khoản demo. Thêm `EDULAB_AI_LIVE_TEST=true` để gửi **một câu hỏi khách thật** bằng cấu hình đã lưu; có thể phát sinh phí và tiêu thụ quota. Không log hoặc screenshot API key.
+
+### Xác nhận chat AI cuối — 05/10/2026
+
+- JDK **21.0.12.1**, Maven **3.9.9**: `clean verify '-Dtest=!MysqlIntegrationTest'` đạt **121 test, 0 failure/error/skip** trên MySQL **8.4.11** tại `127.0.0.1:3307/edulab_test`; đủ **13 migration**, không dùng database remote. Test mới kiểm tra UTC session, reset quota/HMAC qua 00:00 UTC, cleanup và scheduler, cấu hình runtime của trợ giảng, fallback diễn đàn và startup guard remote/local. Testcontainers bị loại có chủ ý; không tuyên bố đã xác nhận Docker.
+- WAR mới chạy riêng trên loopback **8085**, homepage HTTP 200. Đã đối chiếu byte nội dung `application.yml`, V13, JS chat/admin và JSP chat trong WAR với source; không chứa `.tools` hay tệp secret. README là tài liệu source đi kèm, không được Maven nhúng vào WAR. Không thay deployment/connector khác.
+- Browser chat/admin đạt **1440/1024/768/640/390/320 px**: focus/Escape, mobile menu, lịch sử/reset, CSRF khách, phân quyền admin, quota error, AI HTML hiển thị như văn bản và bỏ link ngoài. Lesson đạt 1440/390/320 px và forum fallback được kiểm tra ở 320 px; bật/tắt runtime chặn khách/trợ giảng, nhưng không làm mất bài diễn đàn. Auth/home và profile đều đạt lại sáu kích thước, gồm CSRF, lưu/hoàn tác, đổi mật khẩu và thu hồi mọi phiên. Ba script đều exit 0, không lỗi JavaScript/CSP; log ứng dụng không có mức ERROR/SEVERE trong lần chạy này.
+- Bằng chứng provider thật ngày **02/10/2026**: test kết nối admin thành công; chat khách thật trả lời 347 ký tự và liên kết `/courses/2` tới khóa Toán 8 đang tồn tại. Ảnh `.tools/screenshots/ai/chat-live.png` và log cũ được giữ; ngày 05/10 không gọi lại provider trả phí.
+- Log mới: `.tools/ai-final-verify.log`, `.tools/browser-ai-final-{ai,auth,profile}.log`; marker `.exit` xác nhận kết quả, ảnh trong `.tools/screenshots/ai-final-{ai,auth,profile}/`. Tất cả được Git ignore. Kiểm tra cú pháp JS/shell và `git diff --check` đạt. Tệp secret local quyền `600`, được ignore; kiểm tra source không phát hiện giá trị credential local hoặc các dạng token/private key phổ biến, **không thay thế secret audit đầy đủ**. Credential từng được gửi trong hội thoại cần được **rotate** trước triển khai.
+- Sau browser regression đã dọn đúng hai tài khoản `profile_smoke_student_muuomo5l` / `profile_smoke_parent_muuomo5l`, bốn refresh session của chúng và thảo luận thử ID `3` (kiểm tra khớp title/body/author, không có reply/AI answer/report). Không xóa audit, tài khoản demo, dữ liệu khác hoặc credential cấu hình AI đã lưu.
+
+Giới hạn vận hành vẫn còn: chưa xác nhận database/HTTPS production, policy lưu dữ liệu của provider, tải cao hoặc accessibility audit đầy đủ. Allowlist/public-DNS/no-redirect không thay thế egress firewall và DNS tin cậy. Metadata chat dọn sau hai ngày; quota/trạng thái trợ giảng và bài AI đăng diễn đàn dùng cơ chế lưu trữ sẵn có, không có retention chung mới. Đây vẫn là MVP, không phải cam kết production-ready.
 
 ## Build và kiểm thử
 
@@ -148,7 +180,7 @@ Chạy trước browser smoke trên DB thử có dữ liệu demo và còn lư�
 
 ```bash
 export EDULAB_TEST_DB_URL='jdbc:mysql://127.0.0.1:3307/edulab_test?sslMode=DISABLED&allowPublicKeyRetrieval=true&serverTimezone=UTC'
-export EDULAB_AI_ENABLED=false
+# Tests không gọi provider thật; trạng thái AI runtime nằm trong database.
 export EDULAB_AI_PROVIDER=gatecheap
 export EDULAB_DEV_SCAN_BYPASS=false
 mvn -f "$PROJECT_ROOT/pom.xml" -B '-Dtest=!MysqlIntegrationTest' clean verify
@@ -208,11 +240,36 @@ Giới hạn có sẵn: `pattern="[A-Za-z0-9._-]{3,80}"` của tên đăng nhậ
 
 Xác nhận riêng layout xác thực ngày **30/09/2026**: `clean verify -Dtest=!MysqlIntegrationTest` đạt **73 test, 0 failure/error/skip**, gồm workflow MySQL local; không chạy Docker/Testcontainers. Cả chế độ mặc định và đăng ký PARENT mới đều đạt browser regression ở **1440/1024/768/640/390/320 px**, không tràn ngang, không trùng document/header/footer/ID, không lỗi JavaScript/CSP hoặc request ra ngoài. Đã kiểm tra đăng ký → đăng nhập → đăng xuất, lỗi đăng nhập/đăng ký/đăng xuất, CSRF, xóa cookie và API 401 sau đăng xuất. Tài khoản `auth_layout_test_20260930_1128` và refresh session thử nghiệm đã được dọn khỏi `127.0.0.1:3307/edulab_test`. WAR preview riêng và ảnh ở `.tools/screenshots/auth` được Git ignore, không đưa vào commit. Không xác nhận pixel-perfect với ảnh tham chiếu gốc vì ảnh đó không có trong phiên này.
 
+### Kiểm tra profile — 02/10/2026
+
+Trang `/profile` dùng layout/header/footer chung, responsive và có hai form độc lập. Các API chỉ thao tác tài khoản lấy từ principal đăng nhập, không nhận ID/vai trò/tên đăng nhập để cập nhật:
+
+| API | Chức năng |
+|---|---|
+| `GET /api/v1/profile` | Họ tên, email, tên đăng nhập, vai trò và ID của chính tài khoản |
+| `PUT /api/v1/profile` | Cập nhật `fullName` và `email`, yêu cầu CSRF |
+| `POST /api/v1/profile/password` | Nhận `currentPassword`, `newPassword`, `confirmPassword`, yêu cầu CSRF; thành công trả 204 và kết thúc mọi phiên |
+
+Sai mật khẩu hiện tại trả 400 (không dùng 401 để tránh tự refresh/retry), email trùng trả 409. Đổi mật khẩu bị giới hạn 10 request hợp lệ về cấu trúc/phút/tài khoản bằng limiter trong bộ nhớ, độc lập giới hạn đăng nhập theo IP; vẫn cần limiter dùng chung nếu triển khai nhiều instance. Cập nhật mật khẩu và thu hồi phiên chạy cùng transaction; khóa tài khoản và kiểm tra `auth_version` để từ chối request profile dùng principal đã bị thu hồi. Không đổi cấu trúc database.
+
+Browser regression tạo hai tài khoản STUDENT/PARENT với prefix `profile_smoke_` và hậu tố duy nhất; chỉ chạy khi đã xác nhận datasource server là database thử **local**. Script kiểm tra 6 kích thước, cập nhật/hoàn tác/tải lại, escape tên chứa HTML, email trùng, xác nhận mật khẩu/UTF-8, CSRF, đăng nhập bằng mật khẩu mới và thu hồi phiên trình duyệt khác. Tài khoản thử không tự xóa; script in chính xác hai tên cần dọn cùng refresh session, không được xóa tài khoản hoặc dữ liệu thật.
+
+```bash
+EDULAB_SMOKE_URL='http://127.0.0.1:8084/edulab' \
+EDULAB_PLAYWRIGHT_PATH="$PROJECT_ROOT/.tools/browser/node_modules/playwright" \
+EDULAB_CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+EDULAB_SCREENSHOT_DIR="$PROJECT_ROOT/.tools/screenshots/profile" \
+node "$PROJECT_ROOT/scripts/browser-profile.cjs"
+```
+
+Xác nhận ngày **02/10/2026**: `clean verify -Dtest=!MysqlIntegrationTest` đạt **92 test, 0 failure/error/skip**, gồm workflow MySQL local; không chạy Docker/Testcontainers. WAR mới chạy riêng tại `127.0.0.1:8084/edulab` với database `127.0.0.1:3307/edulab_test`, AI và scan bypass tắt; không ghi đè deployment cổng 8082. Browser profile và hồi quy auth/home đều đạt ở **1440/1024/768/640/390/320 px**, không tràn ngang hoặc lỗi JavaScript/CSP. Đã xác nhận thông tin lưu sau tải lại, tên chứa HTML được escape, cookie bị xóa, mật khẩu cũ bị từ chối, mật khẩu mới đăng nhập được, access/refresh token ở trình duyệt khác bị thu hồi. Ảnh thử nghiệm trong `.tools/screenshots/profile-final` và `.tools/screenshots/profile-auth` được Git ignore.
+
 Kiểm tra cú pháp/whitespace bổ sung:
 
 ```bash
 node --check "$PROJECT_ROOT/scripts/browser-smoke.cjs"
 node --check "$PROJECT_ROOT/scripts/browser-auth.cjs"
+node --check "$PROJECT_ROOT/scripts/browser-profile.cjs"
 find "$PROJECT_ROOT/src/main/resources/static/js" -name '*.js' -exec node --check {} \;
 bash -n "$PROJECT_ROOT/run-local.sh" "$PROJECT_ROOT/run-remote.sh"
 git -C "$PROJECT_ROOT" diff --check
@@ -298,9 +355,9 @@ curl --fail --silent --show-error --output /dev/null 'http://127.0.0.1:8082/edul
 - Cấu hình rõ URL/user/password được duyệt; URL bắt buộc `sslMode=VERIFY_IDENTITY`, CA/truststore đúng. Không dùng public-key retrieval hoặc bỏ kiểm tra TLS cho remote. Dùng tài khoản ứng dụng quyền tối thiểu, tách tài khoản migration có DDL.
 - Bắt buộc HTTPS, secure cookies, reverse proxy/connector được harden, upload riêng ngoài webroot. Không dùng profile local hoặc scan bypass ở server phục vụ người dùng. Gỡ/khóa ứng dụng manager/examples mặc định của Tomcat khi triển khai thật.
 - Cấp JWT key mạnh, riêng từng môi trường, lưu trong secret manager/service configuration; sao lưu và giám sát DB/storage. Không commit `.env`, API key, log, upload, screenshot người dùng hoặc build/tool state.
-- Chỉ bật AI sau khi xác nhận provider/model/key, quota/chi phí và quyền riêng tư; nếu chưa sẵn sàng đặt `EDULAB_AI_ENABLED=false`.
+- Chỉ bật AI trong admin sau khi xác nhận provider/model/key, quota/chi phí và quyền riêng tư; nếu chưa sẵn sàng giữ mục Bật AI tắt.
 
-`$PROJECT_ROOT/run-remote.sh` chạy WAR bằng embedded Tomcat với profile remote, không build hoặc migrate giúp bạn. Nó đọc `.env.remote` nếu có, yêu cầu DB password/JWT secret và yêu cầu AI key nếu bật AI. Chỉ dùng sau khi hoàn tất các bước duyệt triển khai; kiểm tra WAR không cũ. Với Tomcat ngoài, cấu hình cùng các biến qua service manager và deploy thủ công, không chạy script này song song.
+`$PROJECT_ROOT/run-remote.sh` chạy WAR bằng embedded Tomcat với profile remote, không build hoặc migrate giúp bạn. Nó đọc `.env.remote` nếu có, yêu cầu DB password/JWT secret; khóa AI được nhập ở admin, khóa mã hóa đặt ở môi trường server. Chỉ dùng sau khi hoàn tất các bước duyệt triển khai; kiểm tra WAR không cũ. Với Tomcat ngoài, cấu hình cùng các biến qua service manager và deploy thủ công, không chạy script này song song.
 
 ## Cấu trúc và giới hạn còn lại
 

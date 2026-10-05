@@ -42,6 +42,8 @@ public class SecurityConfig {
                         .requestMatchers("/", "/courses", "/courses/*", "/login", "/register", "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh", "/api/v1/auth/csrf",
                                 "/css/**", "/js/**", "/favicon.ico", "/actuator/health").permitAll()
                         .requestMatchers("/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET,"/api/v1/ai/support/status").permitAll()
+                        .requestMatchers(HttpMethod.POST,"/api/v1/ai/support/chat").permitAll()
                         .requestMatchers("/teacher/**", "/api/v1/teacher/**").hasAnyRole("TEACHER", "ADMIN")
                         .requestMatchers("/parent/**", "/api/v1/parent/**").hasAnyRole("PARENT", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()

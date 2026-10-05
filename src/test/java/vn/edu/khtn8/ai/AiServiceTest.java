@@ -56,4 +56,18 @@ class AiServiceTest {
         assertThrows(ResponseStatusException.class, () -> new AiService(properties,provider,lessons,quota,mock(vn.edu.khtn8.content.service.LearningPathService.class)).ask(user,2,"Question"));
         verify(quota).finish(7,false);
     }
+    @Test void runtimeToggleOverridesLegacyConfigurationForLessonAndForumCallers() {
+        var provider=mock(AiProvider.class); var lessons=mock(LessonService.class); var quota=mock(AiQuotaService.class);
+        var runtime=mock(AiSettingsService.class);
+        var service=new AiService(new AppProperties(),provider,lessons,quota,mock(vn.edu.khtn8.content.service.LearningPathService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"runtimeSettings",runtime);
+        when(runtime.enabled()).thenReturn(true);
+        when(provider.providerName()).thenReturn("gatecheap"); when(quota.reserve(1,"gatecheap")).thenReturn(7L);
+        when(lessons.detail(1,2)).thenReturn(new LessonDetail(2L,"Topic","Title","Summary",15,"Goal","<p>Content</p>","NOT_STARTED",0));
+        when(provider.answer(any())).thenReturn(new AiProvider.AiAnswer("Answer",new String[0],true));
+        assertEquals("Answer",service.ask(user,2,"Question").text());
+        when(runtime.enabled()).thenReturn(false);
+        assertEquals(503,assertThrows(ResponseStatusException.class,()->service.ask(user,2,"Question")).getStatusCode().value());
+        verify(provider,times(1)).answer(any());verify(quota,times(1)).reserve(1,"gatecheap");
+    }
 }

@@ -48,4 +48,35 @@ class GateCheapAiProviderTest {
     @Test void missingKeyNeverSendsRequest() {
         assertEquals(503,assertThrows(ResponseStatusException.class, () -> new GateCheapAiProvider(new AppProperties(),RestClient.builder()).answer(question)).getStatusCode().value());
     }
+    @Test void supportUsesDifferentSystemAndIncludesBoundedConversation() {
+        server.expect(anything()).andExpect(jsonPath("$.messages[0].content").value(org.hamcrest.Matchers.containsString("hỗ trợ website")))
+                .andExpect(jsonPath("$.messages[2].role").value("user"))
+                .andExpect(jsonPath("$.messages[3].role").value("assistant"))
+                .andExpect(jsonPath("$.messages[4].content").value("Lớp 8"))
+                .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"Tư vấn\"}}]}",MediaType.APPLICATION_JSON));
+        provider.answer(new AiProvider.AiQuestion("Lớp 8","Danh mục công khai","SUPPORT",java.util.List.of(
+                new AiProvider.ChatMessage("user","Toán"),new AiProvider.ChatMessage("assistant","Bạn học lớp nào?"))));
+        server.verify();
+    }
+    @Test void redirectsNeverExposeKeyOrUpstreamBody() {
+        server.expect(anything()).andRespond(withStatus(HttpStatus.FOUND).header("Location","https://evil.test").body("private-key"));
+        var error=assertThrows(ResponseStatusException.class,()->provider.answer(question));
+        assertFalse(error.getReason().contains("private-key"));server.verify();
+    }
+    @Test void dynamicConfigurationChangesNextRequestWithoutRestart() {
+        var settings=org.mockito.Mockito.mock(AiSettingsService.class);
+        var policy=org.mockito.Mockito.mock(AiEndpointPolicy.class);
+        var builder=RestClient.builder().baseUrl("https://gatecheap.vn/v1");
+        var mockServer=MockRestServiceServer.bindTo(builder).build();
+        var active=new GateCheapAiProvider(new AppProperties(),builder.build(),settings,policy);
+        org.mockito.Mockito.when(settings.current()).thenReturn(
+                new AiSettingsService.RuntimeSettings(true,"https://gatecheap.vn/v1","first-model","first-secret",20,200,1000),
+                new AiSettingsService.RuntimeSettings(true,"https://gatecheap.vn/v1","second-model","second-secret",20,200,500));
+        mockServer.expect(requestTo("https://gatecheap.vn/v1/chat/completions")).andExpect(header("Authorization","Bearer first-secret"))
+                .andExpect(jsonPath("$.model").value("first-model")).andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"OK\"}}]}",MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("https://gatecheap.vn/v1/chat/completions")).andExpect(header("Authorization","Bearer second-secret"))
+                .andExpect(jsonPath("$.model").value("second-model")).andExpect(jsonPath("$.max_tokens").value(500))
+                .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"OK\"}}]}",MediaType.APPLICATION_JSON));
+        active.answer(question);active.answer(question);mockServer.verify();
+    }
 }

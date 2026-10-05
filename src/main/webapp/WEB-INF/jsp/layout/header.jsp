@@ -21,7 +21,7 @@
     <div class="header-account">
         <c:choose>
             <c:when test="${not empty pageContext.request.userPrincipal}">
-                <a class="account-link" href="${pageContext.request.contextPath}/dashboard"><ui:icon name="user"/><span>Góc của tôi</span></a>
+                <a data-nav class="account-link" href="${pageContext.request.contextPath}/profile" aria-label="Thông tin cá nhân" title="Thông tin cá nhân"><ui:icon name="user"/><span>Tài khoản của tôi</span></a>
                 <form id="logoutForm" method="post" action="${pageContext.request.contextPath}/api/v1/auth/logout">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                     <button class="btn btn-outline-primary btn-sm" type="submit">Đăng xuất</button>

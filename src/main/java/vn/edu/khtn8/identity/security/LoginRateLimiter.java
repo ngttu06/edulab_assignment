@@ -15,13 +15,16 @@ public class LoginRateLimiter {
     private final Clock clock;
     public LoginRateLimiter(){this(Clock.systemUTC());}
     LoginRateLimiter(Clock clock){this.clock=clock;}
-    public synchronized void check(String address) {
+    public void check(String address) {
+        check(address, "Quá nhiều lần đăng nhập. Vui lòng đợi một phút.");
+    }
+    public synchronized void check(String address, String message) {
         long now=clock.millis();
         windows.entrySet().removeIf(e->now-e.getValue().start()>=60_000);
         Window window=windows.get(address);
-        if(window==null && windows.size()>=10_000) throw limited();
-        if(window!=null && window.count()>=10) throw limited();
+        if(window==null && windows.size()>=10_000) throw limited(message);
+        if(window!=null && window.count()>=10) throw limited(message);
         windows.put(address,new Window(window==null?now:window.start(),window==null?1:window.count()+1));
     }
-    private static ResponseStatusException limited(){return new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Quá nhiều lần đăng nhập. Vui lòng đợi một phút.");}
+    private static ResponseStatusException limited(String message){return new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,message);}
 }

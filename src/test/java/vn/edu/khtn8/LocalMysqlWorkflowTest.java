@@ -45,11 +45,15 @@ class LocalMysqlWorkflowTest {
     @Autowired AssignmentService assignments;
     @Autowired LearningPathService path;
     @Autowired AuthenticationService authentication;
+    @Autowired vn.edu.khtn8.identity.service.ProfileService profiles;
+    @Autowired vn.edu.khtn8.identity.repository.UserRepository users;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder encoder;
+    @Autowired vn.edu.khtn8.identity.security.JwtService jwt;
     long id(String name){return jdbc.queryForObject("SELECT id FROM users WHERE username=?",Long.class,name);}
     AuthenticatedUser user(String name,String role){return new AuthenticatedUser(id(name),name,name,"unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_"+role)));}
 
     @Test void migrationAndAdminContentWorkflow() {
-        assertEquals(12,jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE",Integer.class));
+        assertEquals(13,jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE",Integer.class));
         var actor=user("admin","ADMIN");
         long topic=jdbc.queryForObject("SELECT MIN(id) FROM topics",Long.class);
         long lesson=admin.createLesson(actor,new AdminController.LessonInput(topic,"Bài kiểm thử","Tóm tắt",10,"Mục tiêu","<h2>Bài học</h2><script>alert(1)</script><p>Kiến thức</p>",null,0));
@@ -134,6 +138,39 @@ class LocalMysqlWorkflowTest {
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM refresh_sessions WHERE family_id=? AND revoked_at IS NULL",Integer.class,family));
         assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM refresh_sessions WHERE family_id=? AND revoked_at IS NULL",Integer.class,otherFamily));
     }
+    @Test void profileUpdatesPersistAndPasswordChangeRevokesEverySession() {
+        var request = new MockHttpServletRequest(); request.setContextPath("/edulab");
+        var first = new MockHttpServletResponse(); var second = new MockHttpServletResponse();
+        authentication.login(new LoginRequest("hocsinh", "ChangeMe123!"), request, first);
+        authentication.login(new LoginRequest("hocsinh", "ChangeMe123!"), request, second);
+        String oldRefresh = refreshToken(first);
+        String oldAccess = first.getHeaders("Set-Cookie").stream().filter(s -> s.startsWith("EDULAB_ACCESS="))
+                .findFirst().orElseThrow().split(";", 2)[0].substring("EDULAB_ACCESS=".length());
+        var principal = AuthenticatedUser.from(users.findById(id("hocsinh")).orElseThrow());
+        var updated = profiles.update(principal, new vn.edu.khtn8.identity.dto.UpdateProfileRequest(
+                "  Học sinh kiểm thử  ", " PROFILE_WORKFLOW@Example.Test "));
+        assertEquals("Học sinh kiểm thử", updated.fullName());
+        assertEquals("profile_workflow@example.test", jdbc.queryForObject("SELECT email FROM users WHERE id=?", String.class, principal.id()));
+        assertEquals("hocsinh", updated.username()); assertEquals("STUDENT", updated.role());
+        assertEquals(principal.authVersion(), jdbc.queryForObject("SELECT auth_version FROM users WHERE id=?", Integer.class, principal.id()));
+        var response = new MockHttpServletResponse();
+        profiles.changePassword(principal, new vn.edu.khtn8.identity.dto.ChangePasswordRequest(
+                "ChangeMe123!", "ProfileNewPassword123!", "ProfileNewPassword123!"), request, response);
+        String hash = jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?", String.class, principal.id());
+        assertTrue(encoder.matches("ProfileNewPassword123!", hash)); assertFalse(encoder.matches("ChangeMe123!", hash));
+        int version = jdbc.queryForObject("SELECT auth_version FROM users WHERE id=?", Integer.class, principal.id());
+        assertEquals(principal.authVersion() + 1, version);
+        assertNotEquals(jwt.parse(oldAccess).get("av", Integer.class), version);
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM refresh_sessions WHERE user_id=? AND revoked_at IS NULL", Integer.class, principal.id()));
+        for (String cookie : new String[]{"EDULAB_ACCESS=", "EDULAB_REFRESH="}) {
+            assertTrue(response.getHeaders("Set-Cookie").stream().anyMatch(s -> s.startsWith(cookie) && s.contains("Max-Age=0") && s.contains("HttpOnly")));
+        }
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> profiles.profile(principal));
+        authentication.login(new LoginRequest("hocsinh", "ProfileNewPassword123!"), request, new MockHttpServletResponse());
+        assertThrows(org.springframework.security.authentication.BadCredentialsException.class,
+                () -> authentication.refresh(oldRefresh, request, new MockHttpServletResponse()));
+    }
+
     private String refreshToken(MockHttpServletResponse response) {
         return response.getHeaders("Set-Cookie").stream().filter(s->s.startsWith("EDULAB_REFRESH=")).findFirst().orElseThrow().split(";",2)[0].substring("EDULAB_REFRESH=".length());
     }

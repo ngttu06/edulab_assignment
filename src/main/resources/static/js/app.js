@@ -43,7 +43,7 @@
         const toggle = document.getElementById('menuToggle');
         const backdrop = document.getElementById('menuBackdrop');
         const mobile = window.matchMedia('(max-width: 991px)');
-        const background = [document.querySelector('.main-content'), document.querySelector('.utility-column'), document.querySelector('.site-footer'), document.querySelector('.app-header'), document.querySelector('.skip-link')].filter(Boolean);
+        const background = [document.querySelector('.main-content'), document.querySelector('.utility-column'), document.querySelector('.site-footer'), document.querySelector('.app-header'), document.querySelector('.skip-link'), document.querySelector('.ai-widget')].filter(Boolean);
         function setMenu(open, restoreFocus = true) {
             if (!menu) return;
             document.body.classList.toggle('menu-open', open);

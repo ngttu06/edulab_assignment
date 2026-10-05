@@ -10,8 +10,10 @@
     <link href="${pageContext.request.contextPath}/css/vendor/bootstrap.min.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/fonts.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/edulab.css" rel="stylesheet">
+    <link href="${pageContext.request.contextPath}/css/ai-chat.css" rel="stylesheet">
     <script src="${pageContext.request.contextPath}/js/app.js" defer></script>
     <script src="${pageContext.request.contextPath}/js/auth.js" defer></script>
+    <script src="${pageContext.request.contextPath}/js/ai-chat.js" defer></script>
 </head>
 <body class="auth-page">
 <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
@@ -21,5 +23,6 @@
     <div class="auth-layout"><jsp:include page="${contentPage}"/></div>
 </main>
 <jsp:include page="/WEB-INF/jsp/layout/footer.jsp"/>
+<jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/>
 </body>
 </html>

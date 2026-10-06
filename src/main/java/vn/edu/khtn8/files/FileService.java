@@ -20,6 +20,24 @@ public class FileService {
         this.jdbc = jdbc; this.storage = storage; this.forum = forum;this.storageSettings=storageSettings;this.r2=r2;
     }
     public record Download(Resource resource, String filename, long length) { }
+    public record ImagePreview(Download download, String contentType) { }
+
+    public ImagePreview image(AuthenticatedUser user, long id) throws IOException {
+        var rows = jdbc.queryForList("SELECT original_filename,content_type,size_bytes,sha256 FROM stored_files WHERE id=? AND scan_status='CLEAN'", id);
+        if (rows.isEmpty()) throw notFound();
+        var file = rows.getFirst();
+        String mime = (String)file.get("content_type");
+        long length = ((Number)file.get("size_bytes")).longValue();
+        if (!java.util.List.of("image/jpeg", "image/png", "image/webp").contains(mime) || length <= 0 || length > 5242880) throw notFound();
+        // Reuse download authorization; never expose an object-store URL or unscanned file.
+        var download = download(user, id);
+        byte[] bytes;
+        try (var input = download.resource().getInputStream()) { bytes = input.readNBytes((int)length + 1); }
+        if (bytes.length != length || !S3Signer.sha256(bytes).equals(file.get("sha256"))) throw notFound();
+        try { FileValidator.validate((String)file.get("original_filename"), mime, bytes, 5242880, 10485760); }
+        catch (ResponseStatusException invalid) { throw notFound(); }
+        return new ImagePreview(new Download(new org.springframework.core.io.ByteArrayResource(bytes), download.filename(), length), mime);
+    }
 
     public Download download(AuthenticatedUser user, long id) throws IOException {
         var rows = jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND scan_status='CLEAN'", id);

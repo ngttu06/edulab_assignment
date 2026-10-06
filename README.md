@@ -396,7 +396,7 @@ curl --fail --silent --show-error --output /dev/null 'http://127.0.0.1:8082/edul
 Host mặc định trong profile/mẫu remote không phải quyền cho phép chạy migration. Database cloud bên dưới đã được chuyển theo yêu cầu riêng của chủ sở hữu; không tự áp dụng lại import/migration trên database đó.
 
 - Automatic Flyway chỉ được phép với **profile local-only và datasource loopback**. Base/remote mặc định tắt Flyway; guard từ chối bật startup migration ngoài local, kể cả khi bị override. Hibernate dùng `ddl-auto=validate`, không tự tạo schema.
-- Với database mới, DBA cần review và chạy riêng 14 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
+- Với database mới, DBA cần review và chạy riêng 15 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
 - Ngoài local, app từ chối startup nếu còn tài khoản enabled mang hash demo. DBA phải đặt hash BCrypt riêng cho admin, đổi mật khẩu/disable các tài khoản demo, tăng `auth_version` và thu hồi refresh sessions liên quan. Đây không thay thế audit mật khẩu và quyền tài khoản đầy đủ.
 - Cấu hình rõ URL/user/password được duyệt; URL bắt buộc `sslMode=VERIFY_IDENTITY`, CA/truststore đúng. Không dùng public-key retrieval hoặc bỏ kiểm tra TLS cho remote. Dùng tài khoản ứng dụng quyền tối thiểu, tách tài khoản migration có DDL.
 - Bắt buộc HTTPS, secure cookies, reverse proxy/connector được harden, upload riêng ngoài webroot. Không dùng profile local hoặc scan bypass ở server phục vụ người dùng. Gỡ/khóa ứng dụng manager/examples mặc định của Tomcat khi triển khai thật.
@@ -420,7 +420,7 @@ Host mặc định trong profile/mẫu remote không phải quyền cho phép ch
 ## Cấu trúc và giới hạn còn lại
 
 - `$PROJECT_ROOT/src/main/java/vn/edu/khtn8`: identity/security, content, assessment, school, community/files, administration, AI và deployment guards.
-- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V14; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
+- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V15; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
 - `$PROJECT_ROOT/src/main/webapp/WEB-INF/jsp`: JSP views; `$PROJECT_ROOT/src/test/java`: unit, security và workflow tests.
 - `$PROJECT_ROOT/scripts/browser-smoke.cjs`: smoke test trình duyệt local-only; `$PROJECT_ROOT/.tools`: công cụ/ảnh/upload local bị Git ignore.
 
@@ -444,4 +444,28 @@ EDULAB_SCREENSHOT_DIR='/Users/ngttu/Workspace/project_asm_prj/.tools/screenshots
 node /Users/ngttu/Workspace/project_asm_prj/scripts/browser-theme.cjs
 ```
 
-Script kiểm tra viewport 1440/1024/768/390/320 px, drawer keyboard, lọc/tìm kiếm, trạng thái rỗng/404, font/assets nội bộ, CSP, overflow và rendering bốn vai trò. Script smoke nghiệp vụ vẫn ở `/Users/ngttu/Workspace/project_asm_prj/scripts/browser-smoke.cjs`.
+Script kiểm tra viewport 1440/1024/768/640/390/320 px, drawer keyboard, lọc/tìm kiếm, trạng thái rỗng/404, font/assets nội bộ, CSP, overflow và rendering bốn vai trò. Script smoke nghiệp vụ vẫn ở `/Users/ngttu/Workspace/project_asm_prj/scripts/browser-smoke.cjs`.
+
+## Trang chủ và bảng tin Cộng đồng
+
+- Trang chủ giữ branding EduLab, font Quicksand và tài sản tự thiết kế; thêm thống kê aggregate thực (không suy ra từ catalog giới hạn 60 khóa) và giáo viên liên kết với khóa học. Không có teacher ID thì hiển thị trạng thái chờ, không tạo giáo viên/ảnh giả. Danh mục hiện tại công khai; chưa có mô hình visibility riêng cho khóa học.
+- `/forum` vẫn yêu cầu đăng nhập. Bảng tin gộp các chuyên mục active mà người dùng có quyền xem, hoặc lọc `?category=...`; bài `PUBLISHED`/`LOCKED` được sắp ID giảm dần. JSP render 10 bài đầu; JavaScript tải theo cursor `before`, có nút “Xem thêm” và link phân trang khi tắt JavaScript. Người dùng bật reduced motion chỉ tải thủ công.
+- API đọc: `GET /api/v1/forum/feed?category=...&before=...&size=10` và `GET /api/v1/forum/threads/{id}/posts?after=...&size=10`; `size` 1–20, cursor ID dương. Kết quả `{items,nextCursor,hasMore}`. Bình luận tăng dần theo ID, chỉ đọc `PUBLISHED`. Author, count và attachment được lấy theo batch; không truy vấn riêng từng bài trong feed.
+- Thích một loại: `PUT /api/v1/forum/threads/{id}/like`, bỏ thích: `DELETE` cùng URL. Cả hai idempotent, cần JWT/CSRF, trả `{liked,count}`; khóa chính `(thread_id,user_id)` và row lock chống yêu cầu trùng/đồng thời. Bài khóa vẫn xem/thích được nhưng không trả lời; bài ẩn hoặc chuyên mục không còn quyền trả 404.
+- Giữ tạo bài, bình luận kèm tối đa 3 tệp, upload trực tiếp R2, AI opt-in/fallback và kiểm duyệt ở trang chi tiết. Sao chép liên kết không cấp quyền xem cho người nhận. Không có realtime, friend graph, chat hoặc reaction nhiều loại.
+- `GET /api/v1/files/{id}/image` chỉ inline JPEG/PNG/WebP `CLEAN`, tối đa 5 MB; dùng quyền download hiện có, kiểm tra MIME/signature, độ dài và SHA-256. Không phục vụ SVG/PDF inline, không lộ URL object store. Download cũ vẫn `attachment`/octet-stream. Feed/comment/image trả private/no-store. Uploader giữ quyền tệp của mình như trước; người khác mất quyền khi bài/chuyên mục bị ẩn hoặc thu hồi.
+- **V15** thêm likes và index phân trang. Chỉ đã migrate trên DB thử loopback; **không áp dụng cho database cloud hoặc deployment đang chạy**. Remote cần DBA review/apply V15 trước khi chạy API mới; base/remote vẫn tắt startup Flyway.
+
+Kiểm thử riêng (chỉ chạy khi đã xác minh server dùng DB local dùng thử; chạy các browser suite **tuần tự**, logout demo thu hồi mọi phiên). Limiter đăng nhập hiện giới hạn 10 lượt/phút/IP, kể cả đăng nhập thành công; nghỉ ít nhất 60 giây giữa các suite nhiều lượt login hoặc khởi động lại preview dùng thử. Không tắt limiter của ứng dụng để chạy kiểm thử:
+
+```bash
+EDULAB_SMOKE_URL='http://127.0.0.1:8086/edulab' \
+EDULAB_PLAYWRIGHT_PATH='/Users/ngttu/Workspace/project_asm_prj/.tools/browser/node_modules/playwright' \
+node /Users/ngttu/Workspace/project_asm_prj/scripts/browser-community.cjs
+```
+
+Script tạo bài/bình luận thử, kiểm tra cursor tự động/thủ công, thích lưu lại, clipboard, keyboard, text escaping, khóa trả lời, upload/AI consent qua network mock; cuối cùng ẩn các bài thử bằng admin. Nó không upload R2 hoặc gọi AI thật. Có thể truyền `EDULAB_IMAGE_FIXTURE_PATH` trỏ JSON `{id,key}` của ảnh CLEAN fixture **được chuẩn bị riêng ở local**, không bật scan bypass hoặc tự thay đổi scan status cho file người dùng.
+
+Java/MySQL: `CommunityMysqlTest`, `CommunitySecurityTest`, `ImagePreviewTest`, `DirectUploadMysqlTest` kiểm tra lớp khác/inactive category, bài ẩn/khóa, cursor, count, like trùng/đồng thời, CSRF/login, preview local/R2 và SHA-256. Toàn bộ `verify -Dtest=!MysqlIntegrationTest` đạt 155 test trên MySQL local; bộ Docker/Testcontainers được loại rõ vì môi trường không có Docker. Chưa kiểm thử live R2/AI, đa trình duyệt, screen reader hoặc chứng nhận accessibility đầy đủ.
+
+Hồi quy trình duyệt Chrome/Playwright đã đạt riêng với `browser-community`, `browser-theme`, `browser-profile`, `browser-storage` (network mock), `browser-ai` (provider mock, runtime-disable thật trên DB local rồi phục hồi). Sáu độ rộng 1440/1024/768/640/390/320 px; ảnh kiểm tra nằm tại `/Users/ngttu/Workspace/project_asm_prj/.tools/screenshots/community` và các thư mục `community-*`. Màu chữ phụ trên bình luận đã điều chỉnh đạt tương phản tối thiểu 4.5:1 với các nền tương ứng; trên màn hình dưới 400 px, ẩn minh họa banner để tránh che nội dung. Browser profile tạo tài khoản thử riêng và giữ lại trong DB test; browser feed ẩn bài thử, không xóa dữ liệu người dùng. Smoke nghiệp vụ đầy đủ `browser-smoke.cjs` chưa chạy lại trong đợt này; các workflow quiz/lớp/gia đình được xác nhận bằng Java/MySQL và rendering bốn vai trò.

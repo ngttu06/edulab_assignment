@@ -2,6 +2,7 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <c:set var="discovery" value="${contentPage == '/WEB-INF/jsp/home.jsp' or contentPage == '/WEB-INF/jsp/catalog/list.jsp'}"/>
+<c:set var="community" value="${contentPage == '/WEB-INF/jsp/forum/list.jsp'}"/>
 <!doctype html>
 <html lang="vi">
 <head>
@@ -13,13 +14,14 @@
     <link href="${pageContext.request.contextPath}/css/fonts.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/edulab.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/ai-chat.css" rel="stylesheet">
+    <c:if test="${contentPage == '/WEB-INF/jsp/home.jsp' or community}"><link href="${pageContext.request.contextPath}/css/discovery.css" rel="stylesheet"></c:if>
     <script src="${pageContext.request.contextPath}/js/app.js" defer></script>
     <script src="${pageContext.request.contextPath}/js/ai-chat.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#mainContent">Đến nội dung chính</a>
 <jsp:include page="/WEB-INF/jsp/layout/header.jsp"/>
-<div class="app-shell ${discovery ? 'discovery-shell' : 'workspace-shell'}">
+<div class="app-shell ${discovery or community ? 'discovery-shell' : 'workspace-shell'} ${community ? 'community-shell' : ''}">
     <aside id="sideNav" class="sidebar" aria-label="Điều hướng chính">
         <div class="sidebar-mobile-title"><span class="brand">EduLab</span><button id="menuClose" type="button" class="icon-button" aria-label="Đóng menu"><ui:icon name="close"/></button></div>
         <a class="sidebar-account" data-nav href="${pageContext.request.contextPath}${empty pageContext.request.userPrincipal ? '/login' : '/dashboard'}"><span class="nav-icon"><ui:icon name="user"/></span>${empty pageContext.request.userPrincipal ? 'Đăng nhập để bắt đầu' : 'Góc học tập của tôi'}</a>
@@ -29,7 +31,7 @@
             <a data-nav href="${pageContext.request.contextPath}/lessons"><span class="nav-icon blue"><ui:icon name="book"/></span>Thư viện bài học</a>
             <a data-nav href="${pageContext.request.contextPath}/quizzes"><span class="nav-icon purple"><ui:icon name="quiz"/></span>Luyện tập &amp; kiểm tra</a>
             <a data-nav href="${pageContext.request.contextPath}/roadmap"><span class="nav-icon orange"><ui:icon name="route"/></span>Lộ trình học</a>
-            <a data-nav href="${pageContext.request.contextPath}/forum"><span class="nav-icon green"><ui:icon name="chat"/></span>Diễn đàn hỏi đáp</a>
+            <a data-nav href="${pageContext.request.contextPath}/forum"><span class="nav-icon green"><ui:icon name="chat"/></span>Cộng đồng hỏi đáp</a>
         </nav>
         <div class="sidebar-section"><h2>Không gian của bạn</h2><nav class="side-links" aria-label="Không gian cá nhân">
             <a data-nav href="${pageContext.request.contextPath}/dashboard"><span class="nav-icon"><ui:icon name="chart"/></span>Tổng quan học tập</a>
@@ -42,8 +44,9 @@
         <p class="sidebar-signature">EduLab · Học chủ động</p>
     </aside>
     <button id="menuBackdrop" class="menu-backdrop" type="button" aria-label="Đóng menu" hidden></button>
-    <main id="mainContent" class="main-content" tabindex="-1"><div id="globalNotice" class="alert alert-danger d-none" role="alert"></div><div class="${discovery ? 'discovery-content' : 'workspace-content'}"><jsp:include page="${contentPage}"/></div></main>
+    <main id="mainContent" class="main-content" tabindex="-1"><div id="globalNotice" class="alert alert-danger d-none" role="alert"></div><div class="${discovery or community ? 'discovery-content' : 'workspace-content'}"><jsp:include page="${contentPage}"/></div></main>
     <c:if test="${discovery}"><jsp:include page="/WEB-INF/jsp/layout/utilities.jsp"/></c:if>
+    <c:if test="${community}"><jsp:include page="/WEB-INF/jsp/forum/rail.jsp"/></c:if>
 </div>
 <jsp:include page="/WEB-INF/jsp/layout/footer.jsp"/>
 <jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/>

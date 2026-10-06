@@ -9,7 +9,7 @@
         try {
             if(document.getElementById('threadAi').checked && !value('threadLesson')) throw new Error('Chọn bài học tham khảo trước khi nhờ AI.');
             const fileIds=await threadUploads.upload();
-            const result = await window.edulab.api('/api/v1/forum/threads', {method: 'POST', body: {categoryId: Number(form.dataset.category), title: value('threadTitle'), body: value('threadBody'),lessonId:Number(value('threadLesson'))||null,askAi:document.getElementById('threadAi').checked,fileIds}});
+            const result = await window.edulab.api('/api/v1/forum/threads', {method: 'POST', body: {categoryId: Number(document.getElementById('threadCategory')?.value || form.dataset.category), title: value('threadTitle'), body: value('threadBody'),lessonId:Number(value('threadLesson'))||null,askAi:document.getElementById('threadAi').checked,fileIds}});
             if(result.aiUnavailable) window.alert('Câu hỏi đã đăng thành công. AI chưa sẵn sàng; hãy đợi cộng đồng hoặc giáo viên trả lời.');
             window.location.assign(window.edulab.context + '/forum/threads/' + result.id);
         } catch (error) { notice.textContent = error.message; button.disabled = false; }

@@ -17,6 +17,8 @@ public class HomeController {
     public String home(Model model,@AuthenticationPrincipal AuthenticatedUser user) {
         model.addAttribute("subjects",catalog.subjects());
         model.addAttribute("grades",catalog.grades());
+        model.addAttribute("statistics",catalog.publicStatistics());
+        model.addAttribute("teachers",catalog.publicTeachers());
         model.addAttribute("courses",catalog.courses(user==null?0:user.id(),vn.edu.khtn8.content.dto.CatalogFilter.all()));
         model.addAttribute("pageTitle", "EduLab · Học chủ động, vững tương lai");
         model.addAttribute("contentPage", "/WEB-INF/jsp/home.jsp");

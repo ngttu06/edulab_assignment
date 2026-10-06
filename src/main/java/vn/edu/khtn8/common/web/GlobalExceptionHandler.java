@@ -45,7 +45,8 @@ public class GlobalExceptionHandler {
         return error(request, HttpStatus.FORBIDDEN, "FORBIDDEN", "Bạn không có quyền thực hiện thao tác này.");
     }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ExceptionHandler({HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     Object malformed(HttpServletRequest request) {
         return error(request, HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Dữ liệu gửi lên không hợp lệ.");
     }

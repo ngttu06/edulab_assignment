@@ -60,7 +60,7 @@ const out = process.env.EDULAB_SCREENSHOT_DIR || '.tools/screenshots';
         await page.waitForFunction(()=>document.getElementById('quizForm').dataset.status==='GRADED');
     }
     const code=await api('/api/v1/family/codes','POST');
-    const category=await page.evaluate(async()=>{const response=await fetch(window.edulab.context+'/forum');const html=await response.text();const doc=new DOMParser().parseFromString(html,'text/html');return Number(doc.getElementById('threadForm').dataset.category);});
+    const category=await page.evaluate(async()=>{const response=await fetch(window.edulab.context+'/forum');const html=await response.text();const doc=new DOMParser().parseFromString(html,'text/html');return Number(doc.querySelector('#threadCategory option').value);});
     const thread=await api('/api/v1/forum/threads','POST',{categoryId:category,title:'Câu hỏi kiểm thử trình duyệt',body:'Làm thế nào để ôn tập?',askAi:false,lessonId:null});
     await navigate('/forum/threads/'+thread.id);await page.screenshot({path:out+'/forum.png',fullPage:true});
     assert.equal((await context.request.get(base+'/admin')).status(),403);

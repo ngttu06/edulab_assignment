@@ -26,7 +26,7 @@ const out = process.env.EDULAB_SCREENSHOT_DIR || '.tools/screenshots/theme';
             await page.evaluate(() => document.fonts.ready);
             assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `No overflow: ${path}`);
         }
-        for (const width of [1440,1024,768,390,320]) {
+        for (const width of [1440,1024,768,640,390,320]) {
             await page.setViewportSize({width,height:width < 640 ? 844 : 1000});
             await navigate('/');
             assert.equal(await page.locator('.app-header').evaluate(el => Math.round(el.getBoundingClientRect().height)), 56);
@@ -115,6 +115,6 @@ const out = process.env.EDULAB_SCREENSHOT_DIR || '.tools/screenshots/theme';
         assert.deepEqual(assets, [], 'All theme assets loaded');
         assert.deepEqual(external, [], 'No external font, stylesheet or script requests');
         assert.deepEqual(errors, [], 'No JavaScript or CSP errors');
-        console.log('PASS: 5 viewports, local assets/fonts, catalog/filter/empty/error pages, drawer focus, and four-role page rendering.');
+        console.log('PASS: 6 viewports, local assets/fonts, catalog/filter/empty/error pages, drawer focus, and four-role page rendering.');
     } finally { await browser.close(); }
 })().catch(error => {console.error(error);process.exit(1);});

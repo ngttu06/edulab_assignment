@@ -38,13 +38,19 @@ class PublicHomeSecurityTest {
         when(catalog.subjects()).thenReturn(subjects);
         when(catalog.grades()).thenReturn(List.of(8));
         when(catalog.courses(0, CatalogFilter.all())).thenReturn(courses);
+        var statistics = Map.<String,Object>of("courses", 6L, "lessons", 8L, "subjects", 6L, "teachers", 1L);
+        var teachers = List.<Map<String,Object>>of(Map.of("name", "Giáo viên", "course_id", 3L));
+        when(catalog.publicStatistics()).thenReturn(statistics);
+        when(catalog.publicTeachers()).thenReturn(teachers);
         mvc.perform(get("/"))
                 .andExpect(status().isOk()).andExpect(view().name("layout/default"))
                 .andExpect(model().attribute("pageTitle", "EduLab · Học chủ động, vững tương lai"))
                 .andExpect(model().attribute("contentPage", "/WEB-INF/jsp/home.jsp"))
                 .andExpect(model().attribute("subjects", subjects))
                 .andExpect(model().attribute("grades", List.of(8)))
-                .andExpect(model().attribute("courses", courses));
+                .andExpect(model().attribute("courses", courses))
+                .andExpect(model().attribute("statistics", statistics))
+                .andExpect(model().attribute("teachers", teachers));
         verify(catalog).courses(0, CatalogFilter.all());
         verifyNoInteractions(school, assignments);
     }

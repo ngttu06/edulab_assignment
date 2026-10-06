@@ -44,4 +44,13 @@ public class FileController {
                 .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
                 .header("X-Content-Type-Options", "nosniff").body(download.resource());
     }
+    @GetMapping("/{id}/image")
+    public ResponseEntity<Resource> image(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) throws IOException {
+        var image = files.image(user, id);
+        var download = image.download();
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(image.contentType())).contentLength(download.length())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(download.filename(), StandardCharsets.UTF_8).build().toString())
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .header("X-Content-Type-Options", "nosniff").body(download.resource());
+    }
 }

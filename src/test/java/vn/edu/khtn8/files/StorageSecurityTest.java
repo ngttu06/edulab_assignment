@@ -29,6 +29,10 @@ class StorageSecurityTest {
     @MockBean DatabaseUserDetailsService users;
     @MockBean JwtService jwt;
     private AuthenticatedUser actor(String role) { return new AuthenticatedUser(1L,"account","Name","unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_"+role))); }
+    @Test void inlinePreviewAlsoRequiresLogin() throws Exception {
+        mvc.perform(get("/api/v1/files/7/image")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(files);
+    }
     @Test void presignAndCompleteNeedAuthenticationAndCsrf() throws Exception {
         String body="{\"filename\":\"a.png\",\"contentType\":\"image/png\",\"size\":9}";
         mvc.perform(post("/api/v1/files/presign").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());

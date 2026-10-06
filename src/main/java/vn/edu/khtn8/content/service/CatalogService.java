@@ -20,6 +20,24 @@ public class CatalogService {
     }
     public List<Integer> grades() { return jdbc.queryForList("SELECT DISTINCT grade_level FROM subjects ORDER BY grade_level", Integer.class); }
 
+    public Map<String,Object> publicStatistics() {
+        return jdbc.queryForMap("""
+                SELECT (SELECT COUNT(*) FROM courses) courses,
+                    (SELECT COUNT(*) FROM subjects WHERE EXISTS(SELECT 1 FROM courses c WHERE c.subject_id=subjects.id)) subjects,
+                    (SELECT COUNT(*) FROM lessons l JOIN topics t ON t.id=l.topic_id JOIN courses c ON c.id=t.course_id
+                        WHERE l.status='PUBLISHED' AND EXISTS(SELECT 1 FROM lesson_versions v WHERE v.lesson_id=l.id AND v.status='PUBLISHED')) lessons,
+                    (SELECT COUNT(DISTINCT c.teacher_id) FROM courses c JOIN users u ON u.id=c.teacher_id WHERE u.enabled=TRUE) teachers
+                """);
+    }
+    public List<Map<String,Object>> publicTeachers() {
+        return jdbc.queryForList("""
+                SELECT u.full_name name,MIN(c.id) course_id,COUNT(DISTINCT c.id) course_count,
+                    GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ' · ') subjects
+                FROM courses c JOIN users u ON u.id=c.teacher_id JOIN subjects s ON s.id=c.subject_id
+                WHERE u.enabled=TRUE GROUP BY u.id,u.full_name ORDER BY u.full_name,u.id LIMIT 8
+                """);
+    }
+
     public List<Map<String,Object>> courses(long studentId, CatalogFilter filter) {
         var args = new ArrayList<Object>();
         args.add(studentId); args.addAll(Arrays.asList(filter.parameters()));

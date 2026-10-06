@@ -3,6 +3,9 @@ package vn.edu.khtn8.community;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Collections;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -29,6 +32,91 @@ public class ForumService {
         if (categories(user).stream().noneMatch(c -> ((Number)c.get("id")).longValue() == id))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chuyên mục.");
     }
+    public record FeedPage(List<Map<String,Object>> items, Long nextCursor, boolean hasMore) { }
+    public record LikeState(boolean liked, long count) { }
+
+    public FeedPage feed(AuthenticatedUser user, Long categoryId, Long before, int size) {
+        validateCursor(before, size);
+        var allowed = categories(user);
+        if (categoryId != null && allowed.stream().noneMatch(c -> number(c.get("id")) == categoryId))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy chuyên mục.");
+        if (allowed.isEmpty()) return new FeedPage(List.of(), null, false);
+        var ids = categoryId == null ? allowed.stream().map(c -> number(c.get("id"))).toList() : List.of(categoryId);
+        var args = new ArrayList<Object>(ids);
+        String cursor = before == null ? "" : " AND t.id<?";
+        if (before != null) args.add(before);
+        args.add(size + 1);
+        var rows = jdbc.queryForList("""
+                SELECT t.id,t.title,t.body,t.status,t.author_id,t.category_id,u.full_name author,c.name category_name,
+                    DATE_FORMAT(t.created_at,'%Y-%m-%d %H:%i UTC') created_at
+                FROM forum_threads t JOIN users u ON u.id=t.author_id JOIN forum_categories c ON c.id=t.category_id
+                WHERE t.status IN ('PUBLISHED','LOCKED') AND t.category_id IN (
+                """ + placeholders(ids.size()) + ")" + cursor + " ORDER BY t.id DESC LIMIT ?", args.toArray());
+        boolean more = rows.size() > size;
+        var items = new ArrayList<>(rows.subList(0, Math.min(size, rows.size())));
+        enrichThreads(user, items);
+        return new FeedPage(items, more ? number(items.getLast().get("id")) : null, more);
+    }
+    public FeedPage comments(AuthenticatedUser user, long threadId, Long after, int size) {
+        validateCursor(after, size);
+        thread(user, threadId);
+        var rows = jdbc.queryForList("""
+                SELECT p.id,p.body,p.author_id,u.full_name author,DATE_FORMAT(p.created_at,'%Y-%m-%d %H:%i UTC') created_at
+                FROM forum_posts p JOIN users u ON u.id=p.author_id
+                WHERE p.thread_id=? AND p.status='PUBLISHED' AND p.id>? ORDER BY p.id LIMIT ?
+                """, threadId, after == null ? 0 : after, size + 1);
+        boolean more = rows.size() > size;
+        var items = new ArrayList<>(rows.subList(0, Math.min(size, rows.size())));
+        attachFiles(items, false);
+        return new FeedPage(items, more ? number(items.getLast().get("id")) : null, more);
+    }
+    @Transactional
+    public LikeState like(AuthenticatedUser user, long threadId, boolean liked) {
+        // Serializes duplicate/concurrent requests with replies and moderation of this thread.
+        jdbc.queryForList("SELECT id FROM forum_threads WHERE id=? FOR UPDATE", threadId);
+        thread(user, threadId);
+        if (liked) jdbc.update("INSERT INTO forum_thread_likes(thread_id,user_id) VALUES(?,?) ON DUPLICATE KEY UPDATE user_id=VALUES(user_id)", threadId, user.id());
+        else jdbc.update("DELETE FROM forum_thread_likes WHERE thread_id=? AND user_id=?", threadId, user.id());
+        return new LikeState(liked, jdbc.queryForObject("SELECT COUNT(*) FROM forum_thread_likes WHERE thread_id=?", Long.class, threadId));
+    }
+    private void enrichThreads(AuthenticatedUser user, List<Map<String,Object>> items) {
+        if (items.isEmpty()) return;
+        var ids = items.stream().map(t -> t.get("id")).toArray();
+        String in = placeholders(ids.length);
+        var comments = counts(jdbc.queryForList("SELECT thread_id,COUNT(*) total FROM forum_posts WHERE status='PUBLISHED' AND thread_id IN (" + in + ") GROUP BY thread_id", ids));
+        var args = new ArrayList<Object>(); args.add(user.id()); Collections.addAll(args, ids);
+        var likes = jdbc.queryForList("SELECT thread_id,COUNT(*) total,MAX(user_id=?) liked FROM forum_thread_likes WHERE thread_id IN (" + in + ") GROUP BY thread_id", args.toArray());
+        var states = new HashMap<Long,Map<String,Object>>();
+        for (var like : likes) states.put(number(like.get("thread_id")), like);
+        for (var item : items) {
+            long id = number(item.get("id")); var state = states.get(id);
+            item.put("comment_count", comments.getOrDefault(id, 0L));
+            item.put("like_count", state == null ? 0L : number(state.get("total")));
+            item.put("liked", state != null && number(state.get("liked")) > 0);
+        }
+        attachFiles(items, true);
+    }
+    private Map<Long,Long> counts(List<Map<String,Object>> rows) {
+        var counts = new HashMap<Long,Long>();
+        for (var row : rows) counts.put(number(row.get("thread_id")), number(row.get("total")));
+        return counts;
+    }
+    private void attachFiles(List<Map<String,Object>> items, boolean threads) {
+        if (items.isEmpty()) return;
+        String table = threads ? "forum_thread_attachments" : "forum_post_attachments";
+        String key = threads ? "thread_id" : "forum_post_id";
+        var files = jdbc.queryForList("SELECT a." + key + " parent_id,f.id,f.original_filename,f.scan_status,f.content_type FROM " + table +
+                " a JOIN stored_files f ON f.id=a.stored_file_id WHERE a." + key + " IN (" + placeholders(items.size()) + ") ORDER BY f.id", items.stream().map(t -> t.get("id")).toArray());
+        var byParent = new HashMap<Long,List<Map<String,Object>>>();
+        for (var file : files) byParent.computeIfAbsent(number(file.get("parent_id")), ignored -> new ArrayList<>()).add(file);
+        for (var item : items) item.put("files", byParent.getOrDefault(number(item.get("id")), List.of()));
+    }
+    private static long number(Object value) { return ((Number)value).longValue(); }
+    private static String placeholders(int size) { return String.join(",", Collections.nCopies(size, "?")); }
+    private void validateCursor(Long cursor, int size) {
+        if ((cursor != null && cursor <= 0) || size < 1 || size > 20)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mốc phân trang hoặc số bài không hợp lệ.");
+    }
     public List<Map<String, Object>> threads(AuthenticatedUser user, long categoryId, int page) {
         categoryAccess(user, categoryId);
         if (page < 0 || page > 10000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trang không hợp lệ.");
@@ -42,14 +130,14 @@ public class ForumService {
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy thảo luận.");
         var thread = rows.getFirst();
         categoryAccess(user, ((Number)thread.get("category_id")).longValue());
-        thread.put("files",jdbc.queryForList("SELECT f.id,f.original_filename,f.scan_status FROM forum_thread_attachments a JOIN stored_files f ON f.id=a.stored_file_id WHERE a.thread_id=?",id));
+        thread.put("files",jdbc.queryForList("SELECT f.id,f.original_filename,f.scan_status,f.content_type FROM forum_thread_attachments a JOIN stored_files f ON f.id=a.stored_file_id WHERE a.thread_id=?",id));
         return thread;
     }
     public List<Map<String, Object>> posts(AuthenticatedUser user, long threadId, int page) {
         thread(user, threadId);
         if (page < 0 || page > 10000) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trang không hợp lệ.");
         var posts = jdbc.queryForList("SELECT p.id,p.body,p.author_id,p.created_at,u.full_name author FROM forum_posts p JOIN users u ON u.id=p.author_id WHERE p.thread_id=? AND p.status='PUBLISHED' ORDER BY p.id LIMIT 20 OFFSET ?", threadId, page * 20);
-        for (var post : posts) post.put("files", jdbc.queryForList("SELECT f.id,f.original_filename,f.scan_status FROM forum_post_attachments a JOIN stored_files f ON f.id=a.stored_file_id WHERE a.forum_post_id=?", post.get("id")));
+        attachFiles(posts, false);
         return posts;
     }
     @Transactional

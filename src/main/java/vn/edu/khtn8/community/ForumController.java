@@ -25,15 +25,38 @@ public class ForumController {
 
     @GetMapping("/forum")
     public String index(@AuthenticationPrincipal AuthenticatedUser user, @RequestParam(required=false) Long category,
-                        @RequestParam(defaultValue="0") int page, Model model) {
+                        @RequestParam(required=false) Long before, Model model) {
         var categories = forum.categories(user);
         model.addAttribute("categories", categories);
-        if (category == null && !categories.isEmpty()) category = ((Number)categories.getFirst().get("id")).longValue();
         model.addAttribute("categoryId", category);
-        model.addAttribute("threads", category == null ? List.of() : forum.threads(user, category, page));
-        model.addAttribute("page", page);
+        var feed = forum.feed(user, category, before, 10);
+        model.addAttribute("threads", feed.items());
+        model.addAttribute("nextCursor", feed.nextCursor());
+        model.addAttribute("hasMore", feed.hasMore());
         model.addAttribute("lessons",lessons.list(user.id()));
         return view(model, "list");
+    }
+    @GetMapping("/api/v1/forum/feed") @ResponseBody
+    public ForumService.FeedPage feed(@AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required=false) Long category, @RequestParam(required=false) Long before,
+            @RequestParam(defaultValue="10") int size, jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "private, no-store");
+        return forum.feed(user, category, before, size);
+    }
+    @GetMapping("/api/v1/forum/threads/{id}/posts") @ResponseBody
+    public ForumService.FeedPage comments(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable long id,
+            @RequestParam(required=false) Long after, @RequestParam(defaultValue="10") int size,
+            jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "private, no-store");
+        return forum.comments(user, id, after, size);
+    }
+    @PutMapping("/api/v1/forum/threads/{id}/like") @ResponseBody
+    public ForumService.LikeState like(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable long id) {
+        return forum.like(user, id, true);
+    }
+    @DeleteMapping("/api/v1/forum/threads/{id}/like") @ResponseBody
+    public ForumService.LikeState unlike(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable long id) {
+        return forum.like(user, id, false);
     }
     @GetMapping("/forum/threads/{id}")
     public String detail(@PathVariable long id, @RequestParam(defaultValue="0") int page,
@@ -81,7 +104,7 @@ public class ForumController {
         forum.moderate(user, id, request.status());
     }
     private String view(Model model, String view) {
-        model.addAttribute("pageTitle", "Diễn đàn · EduLab");
+        model.addAttribute("pageTitle", "Cộng đồng · EduLab");
         model.addAttribute("contentPage", "/WEB-INF/jsp/forum/" + view + ".jsp");
         return "layout/default";
     }

@@ -35,6 +35,7 @@ class DirectUploadMysqlTest {
     @Autowired StorageSettingsService settings;
     @Autowired JdbcTemplate jdbc;
     @Autowired AiAttachmentService attachments;
+    @Autowired FileService files;
     @Autowired vn.edu.khtn8.community.ForumService forum;
     @MockBean R2Client r2;
     @MockBean FileScanner scanner;
@@ -104,6 +105,7 @@ class DirectUploadMysqlTest {
         var ticket=uploads.presign(student,new DirectUploadService.Input("a.png","image/png",png.length));
         var status=uploads.complete(student,ticket.uploadId());assertEquals("PENDING_SCAN",status.scanStatus());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->attachments.load(student,List.of(status.fileId()))).getStatusCode().value());
+        assertThrows(ResponseStatusException.class,()->files.image(student,status.fileId()));
         long category=((Number)forum.categories(student).getFirst().get("id")).longValue();
         long thread=forum.create(student,category,"File sample","Body",null,List.of(status.fileId()));
         assertTrue(forum.canDownload(other,status.fileId()));
@@ -111,6 +113,19 @@ class DirectUploadMysqlTest {
         jdbc.update("UPDATE forum_threads SET status='HIDDEN' WHERE id=?",thread);
         assertFalse(forum.canDownload(other,status.fileId()));
         assertThrows(ResponseStatusException.class,()->forum.create(other,category,"Stolen","Body",null,List.of(status.fileId())));
+    }
+    @Test void cleanR2ImagePreviewFollowsAttachmentPermissionsAndRejectsHiddenThreads() throws Exception {
+        var ticket=uploads.presign(student,new DirectUploadService.Input("preview.png","image/png",png.length));
+        long file=uploads.complete(student,ticket.uploadId()).fileId();
+        assertEquals("image/png",files.image(student,file).contentType());
+        assertThrows(ResponseStatusException.class,()->files.image(other,file));
+        long category=((Number)forum.categories(student).getFirst().get("id")).longValue();
+        long thread=forum.create(student,category,"Image preview test","Body",null,List.of(file));
+        assertEquals(1,((List<?>)forum.feed(other,category,null,10).items().getFirst().get("files")).size());
+        assertArrayEquals(png,files.image(other,file).download().resource().getContentAsByteArray());
+        forum.moderate(admin,thread,"HIDDEN");
+        assertThrows(ResponseStatusException.class,()->files.image(other,file));
+        assertNotNull(files.image(student,file),"Uploader retains their original download rights");
     }
     @Test void disabledStorageAndInvalidMetadataNeverIssueUrls() {
         save(false,false,false,104857600);

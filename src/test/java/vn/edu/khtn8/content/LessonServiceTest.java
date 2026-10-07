@@ -10,6 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class LessonServiceTest {
+    @Test void videoLessonsCannotUseManualProgressApi() {
+        var repository=mock(LessonRepository.class);
+        when(repository.lockHasVideo(4)).thenReturn(true);
+        var error=assertThrows(ResponseStatusException.class,()->new LessonService(repository).updateProgress(2,4,new ProgressRequest("COMPLETED",100)));
+        assertEquals(409,error.getStatusCode().value());
+        verify(repository,never()).upsertProgress(anyLong(),anyLong(),anyString(),anyInt());
+    }
     @Test void validatesProgressState() {
         var repository = mock(LessonRepository.class);
         var service = new LessonService(repository);

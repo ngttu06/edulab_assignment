@@ -19,7 +19,7 @@ public class LessonService {
         String safeHtml = org.jsoup.Jsoup.clean(lesson.contentHtml(), org.jsoup.safety.Safelist.basic().addTags("h2","h3","h4"));
         return new LessonDetail(lesson.id(), lesson.topicName(), lesson.title(), lesson.summary(),
                 lesson.durationMinutes(), lesson.objectives(), safeHtml, lesson.progressStatus(), lesson.completionPercent(),
-                lesson.courseId(),lesson.courseTitle(),lesson.subjectName(),lesson.gradeLevel());
+                lesson.courseId(),lesson.courseTitle(),lesson.subjectName(),lesson.gradeLevel(),lesson.hasVideo());
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('STUDENT')")
     @org.springframework.transaction.annotation.Transactional
@@ -32,6 +32,8 @@ public class LessonService {
         };
         if (!valid)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trạng thái và phần trăm tiến độ không hợp lệ.");
+        if (lessons.lockHasVideo(lessonId))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Bài học có video: tiến độ được lưu theo các đoạn đã xem, không thể đánh dấu thủ công.");
         detail(studentId, lessonId);
         lessons.upsertProgress(studentId, lessonId, request.status(), request.completionPercent());
     }

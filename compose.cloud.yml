@@ -1,0 +1,52 @@
+# MySQL is external. docker-compose.yml remains the local database fixture.
+x-application: &application
+  image: ${EDULAB_IMAGE:-edulab-khtn8:latest}
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file:
+    - ${EDULAB_ENV_FILE:-.env.remote}
+
+services:
+  migrate:
+    <<: *application
+    command: ["migrate"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  app:
+    <<: *application
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SPRING_PROFILES_ACTIVE: remote
+      SPRING_FLYWAY_ENABLED: "false"
+      EDULAB_SERVER_PORT: "8080"
+      EDULAB_UPLOAD_ROOT: /var/lib/edulab/storage
+      EDULAB_COOKIE_SECURE: "true"
+      EDULAB_DEV_SCAN_BYPASS: "false"
+      # Enable only behind a trusted HTTPS proxy; do not expose this port publicly.
+      SERVER_FORWARD_HEADERS_STRATEGY: ${EDULAB_FORWARD_HEADERS_STRATEGY:-none}
+    ports:
+      - "${EDULAB_BIND_ADDRESS:-127.0.0.1}:${EDULAB_HTTP_PORT:-8080}:8080"
+    volumes:
+      - app-storage:/var/lib/edulab/storage
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  app-storage:

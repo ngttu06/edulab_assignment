@@ -4,6 +4,24 @@ Website học tập EduLab, khởi đầu với Khoa học tự nhiên lớp 8 v
 
 Đây là **MVP học tập, chưa phải bản production-ready**. Không dùng dữ liệu cá nhân thật của học sinh để kiểm thử.
 
+## Chạy Docker với MySQL cloud
+
+Image chứa ứng dụng, Java 21, embedded Tomcat/JSP và tài nguyên tĩnh. Không cần
+Java/Maven trên máy chạy, không khởi tạo MySQL local, không đưa secret vào image.
+Giữ cấu hình/khóa mã hóa hiện có trong `.env.remote` riêng tư, xem
+[hướng dẫn Docker cloud](docs/docker-cloud.md) về backup/migration, HTTPS và chuyển image.
+
+```bash
+cd /Users/ngttu/Workspace/project_asm_prj
+docker compose -f compose.cloud.yml up -d --build --wait
+```
+
+Mặc định bước chuẩn bị DB chỉ validate. Nếu cloud thiếu V15/V16, lệnh dừng trước
+khi chạy app; sau khi backup và review, đặt `EDULAB_MIGRATE_ON_DEPLOY=true` trong
+`.env.remote` để duyệt job migration riêng. Không sửa schema tự động trong app.
+Cổng mặc định `127.0.0.1:8080`, context `/edulab`; đăng nhập cần HTTPS vì cookie Secure.
+PlayerJS/HLS vẫn cần build hợp lệ của chủ website, không có player giả trong image.
+
 ## Chức năng hiện có
 
 - **Danh mục khóa học:** trang chủ và `/courses` dùng môn học, khối lớp, số bài, thời lượng và tiến độ từ database; tìm kiếm và lọc theo môn/khối/khóa. Chi tiết khóa học hiển thị chương trình, trạng thái và bài tiên quyết. Không dựng giá bán, đánh giá, thống kê hoặc giáo viên giả.
@@ -11,6 +29,8 @@ Website học tập EduLab, khởi đầu với Khoa học tự nhiên lớp 8 v
 - **Thông tin cá nhân:** `/profile` cho mọi vai trò đã đăng nhập; sửa họ tên/email, giữ nguyên tên đăng nhập/vai trò. Email không được trùng tài khoản khác. Đổi mật khẩu cần mật khẩu hiện tại và xác nhận mật khẩu mới; tối thiểu 8 ký tự, tối đa 72 byte UTF-8, không được dùng lại mật khẩu hiện tại. Mật khẩu được băm BCrypt; đổi thành công thu hồi mọi access/refresh session, xóa cookie và yêu cầu đăng nhập lại. Chưa có xác minh email, ảnh đại diện hoặc các trường cá nhân bổ sung.
 - **Bảo vệ request:** CSRF cho thao tác thay đổi dữ liệu, kể cả login/register/refresh; lấy token qua `/api/v1/auth/csrf`. Token đăng nhập không trả trong JSON hoặc lưu trong browser storage. Có giới hạn đăng nhập trong bộ nhớ của từng instance.
 - **Bài học và lộ trình:** bài đã xuất bản, HTML được lọc, mục tiêu học tập, tiến độ riêng và dashboard lấy dữ liệu thật. Bài tiên quyết có thể yêu cầu hoàn thành và đạt điểm quiz tối thiểu; kiểm tra quyền mở bài ở server. Admin tạo và xuất bản bài học, câu hỏi trắc nghiệm, quiz.
+- **Học qua video:** thư viện có nút học video theo bài; `/lessons/{id}/video` dùng YouTube IFrame API hoặc PlayerJS miễn phí với m3u8. `/teacher/videos` quản lý một video chính mỗi bài; admin phân công giáo viên theo bài, kiểm tra quyền ở server. Timeline tùy biến trong khung player tô các khoảng đã xem rời rạc, không tô đoạn tua bỏ qua; hỗ trợ tua bằng bàn phím/chạm và fullscreen của khung. YouTube giữ controls chính thức và thêm timeline bên dưới, không can thiệp iframe.
+  - [Hướng dẫn video, API và giới hạn](docs/lesson-video-learning.md). Cần cài build PlayerJS miễn phí của website ở `src/main/resources/static/js/vendor/playerjs.js` và allowlist domain HLS trước khi phát m3u8. Mặc định hoàn thành ở 95%, giáo viên chỉnh được 80–100%. Lưu các khoảng đã xem + resume theo phiên bản, không cộng trùng; đồng bộ mỗi 10 giây/pause/seek. Thay/gỡ video bắt đầu lại tiến độ bài và giữ lịch sử video cũ; bài có video không cho đánh dấu hoàn thành thủ công.
 - **Quiz:** PRACTICE và TEST; snapshot câu hỏi/đáp án khi bắt đầu, giới hạn lượt, tiếp tục bài đang làm, tự lưu và khôi phục câu trả lời. Server chấm điểm có trọng số trên thang 10. Khi hết giờ, chỉ chấm câu trả lời đã lưu; không nhận đáp án mới từ request nộp muộn. Nộp lại trả kết quả đã lưu. PRACTICE công bố đáp án sau chấm; TEST còn phải chờ lịch công bố. Có tác vụ hoàn tất bài hết giờ.
 - **Lớp học:** giáo viên xem lớp được phân công, giao quiz đã xuất bản với hạn nộp, xem kết quả và nhận xét học sinh. Học sinh và phụ huynh đã liên kết xem bài được giao và nhận xét. Bài được tính hoàn thành khi có lượt chấm nộp trong khoảng từ lúc giao đến hạn nộp; kết quả trước lúc giao không được tính. Admin quản lý lớp, ghi danh và phân công giáo viên.
 - **Gia đình:** mã liên kết ngẫu nhiên 128-bit, lưu hash, dùng một lần, hết hạn sau 15 phút. Học sinh/phụ huynh có thể thu hồi liên kết; kiểm tra phạm vi truy cập báo cáo ở server.
@@ -396,7 +416,7 @@ curl --fail --silent --show-error --output /dev/null 'http://127.0.0.1:8082/edul
 Host mặc định trong profile/mẫu remote không phải quyền cho phép chạy migration. Database cloud bên dưới đã được chuyển theo yêu cầu riêng của chủ sở hữu; không tự áp dụng lại import/migration trên database đó.
 
 - Automatic Flyway chỉ được phép với **profile local-only và datasource loopback**. Base/remote mặc định tắt Flyway; guard từ chối bật startup migration ngoài local, kể cả khi bị override. Hibernate dùng `ddl-auto=validate`, không tự tạo schema.
-- Với database mới, DBA cần review và chạy riêng 15 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
+- Với database mới, DBA cần review và chạy riêng 16 migration trong `$PROJECT_ROOT/src/main/resources/db/migration` bằng quy trình Flyway được duyệt: backup, diễn tập trên staging, kiểm tra checksum/history và kế hoạch rollback. Không sửa migration đã áp dụng, bật `baseline-on-migrate`, hoặc chuyển profile local để lách guard. Có seed demo trong migration, cần xử lý trước khi phục vụ người dùng.
 - Ngoài local, app từ chối startup nếu còn tài khoản enabled mang hash demo. DBA phải đặt hash BCrypt riêng cho admin, đổi mật khẩu/disable các tài khoản demo, tăng `auth_version` và thu hồi refresh sessions liên quan. Đây không thay thế audit mật khẩu và quyền tài khoản đầy đủ.
 - Cấu hình rõ URL/user/password được duyệt; URL bắt buộc `sslMode=VERIFY_IDENTITY`, CA/truststore đúng. Không dùng public-key retrieval hoặc bỏ kiểm tra TLS cho remote. Dùng tài khoản ứng dụng quyền tối thiểu, tách tài khoản migration có DDL.
 - Bắt buộc HTTPS, secure cookies, reverse proxy/connector được harden, upload riêng ngoài webroot. Không dùng profile local hoặc scan bypass ở server phục vụ người dùng. Gỡ/khóa ứng dụng manager/examples mặc định của Tomcat khi triển khai thật.
@@ -420,7 +440,7 @@ Host mặc định trong profile/mẫu remote không phải quyền cho phép ch
 ## Cấu trúc và giới hạn còn lại
 
 - `$PROJECT_ROOT/src/main/java/vn/edu/khtn8`: identity/security, content, assessment, school, community/files, administration, AI và deployment guards.
-- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V15; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
+- `$PROJECT_ROOT/src/main/resources/db/migration`: schema/seed V1–V16; `$PROJECT_ROOT/src/main/resources/static`: CSS/JS nghiệp vụ.
 - `$PROJECT_ROOT/src/main/webapp/WEB-INF/jsp`: JSP views; `$PROJECT_ROOT/src/test/java`: unit, security và workflow tests.
 - `$PROJECT_ROOT/scripts/browser-smoke.cjs`: smoke test trình duyệt local-only; `$PROJECT_ROOT/.tools`: công cụ/ảnh/upload local bị Git ignore.
 

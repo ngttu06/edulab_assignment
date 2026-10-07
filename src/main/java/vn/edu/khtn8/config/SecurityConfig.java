@@ -32,8 +32,13 @@ public class SecurityConfig {
                                             WebAuthenticationEntryPoint entryPoint,
                                             com.fasterxml.jackson.databind.ObjectMapper json,
                                             vn.edu.khtn8.common.config.AppProperties properties,
-                                            @org.springframework.beans.factory.annotation.Value("${EDULAB_STORAGE_ALLOWED_HOSTS:c9da795e23235545fa54e8c7ee61d3cf.r2.cloudflarestorage.com}") String storageHosts) throws Exception {
+                                            @org.springframework.beans.factory.annotation.Value("${EDULAB_STORAGE_ALLOWED_HOSTS:c9da795e23235545fa54e8c7ee61d3cf.r2.cloudflarestorage.com}") String storageHosts,
+                                            @org.springframework.beans.factory.annotation.Value("${EDULAB_VIDEO_ALLOWED_HOSTS:}") String videoHosts) throws Exception {
         var storageEndpoints=new vn.edu.khtn8.files.StorageEndpointPolicy(storageHosts);
+        var videoPolicy=new vn.edu.khtn8.content.video.VideoPolicy(videoHosts,"/js/vendor/playerjs.js");
+        String mediaSources=videoPolicy.hosts().stream().map(h->"https://"+h).collect(java.util.stream.Collectors.joining(" "));
+        String baseCsp="default-src 'self'; connect-src 'self' "+storageEndpoints.cspSources()+"; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+        String videoCsp="default-src 'self'; connect-src 'self' "+storageEndpoints.cspSources()+" "+mediaSources+" https://www.youtube.com; script-src 'self' https://cdn.jsdelivr.net https://www.youtube.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://i.ytimg.com; media-src 'self' blob: "+mediaSources+"; worker-src 'self' blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
         CookieCsrfTokenRepository csrf = new CookieCsrfTokenRepository();
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(properties.getCookie().isSecure()).sameSite("Strict"));
         http
@@ -63,11 +68,17 @@ public class SecurityConfig {
                             }
                         }))
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; connect-src 'self' "+storageEndpoints.cspSources()+"; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"))
+                        .addHeaderWriter((request,response)-> {
+                            Object original=request.getAttribute("jakarta.servlet.forward.request_uri");
+                            String uri=original instanceof String value ? value : request.getRequestURI();
+                            String route=uri.substring(request.getContextPath().length());
+                            boolean videoPage=route.matches("/lessons/[0-9]+/video") || route.equals("/teacher/videos");
+                            response.setHeader("Content-Security-Policy",videoPage ? videoCsp : baseCsp);
+                            response.setHeader("Referrer-Policy",videoPage ? "strict-origin-when-cross-origin" : "same-origin");
+                            if (route.contains("/video") || route.equals("/teacher/videos")) response.setHeader("Cache-Control","private, no-store");
+                        })
                         .contentTypeOptions(contentTypeOptions -> {})
-                        .frameOptions(frame -> frame.deny())
-                        .referrerPolicy(referrer -> referrer.policy(
-                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN)))
+                        .frameOptions(frame -> frame.deny()))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

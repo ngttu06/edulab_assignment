@@ -12,6 +12,7 @@
 <p><c:out value="${lesson.summary()}"/></p>
 <p class="small text-muted"><c:out value="${lesson.durationMinutes()}"/> phút · Tiến độ: <c:out value="${lesson.completionPercent()}"/>%</p><progress class="mb-3" aria-label="Tiến độ bài học" value="${lesson.completionPercent()}" max="100">${lesson.completionPercent()}%</progress>
 <a class="btn btn-primary" href="${pageContext.request.contextPath}/lessons/${lesson.id()}">Mở bài học</a>
+<c:choose><c:when test="${lesson.hasVideo()}"><a class="btn btn-outline-primary mt-2" href="${pageContext.request.contextPath}/lessons/${lesson.id()}/video">${lesson.completionPercent() > 0 ? 'Tiếp tục xem video' : 'Học qua video'}</a></c:when><c:otherwise><span class="d-block small text-muted mt-2">Chưa có video</span></c:otherwise></c:choose>
 </div></article></div>
 </c:forEach>
 <c:if test="${empty lessons}"><div class="empty-state"><ui:icon name="book"/><h2>Chưa có bài học phù hợp</h2><p>Thử thay đổi bộ lọc hoặc quay lại khi nội dung được xuất bản.</p></div></c:if>

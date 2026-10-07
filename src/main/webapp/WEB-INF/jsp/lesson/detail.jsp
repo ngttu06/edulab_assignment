@@ -8,7 +8,8 @@
 <p><strong>Mục tiêu:</strong> <c:out value="${lesson.objectives()}"/></p>
 <div class="lesson-content">${lesson.contentHtml()}</div>
 <hr><p>Tiến độ: <strong id="progressValue"><c:out value="${lesson.completionPercent()}"/>%</strong></p>
-<c:if test="${pageContext.request.isUserInRole('STUDENT')}">
+<c:if test="${lesson.hasVideo()}"><p class="text-muted">Tiến độ bài này được tính từ các đoạn video đã xem.</p><a class="btn btn-primary" href="${pageContext.request.contextPath}/lessons/${lesson.id()}/video">Học qua video →</a></c:if>
+<c:if test="${pageContext.request.isUserInRole('STUDENT') and not lesson.hasVideo()}">
 <button id="complete" type="button" class="btn btn-success" data-id="${lesson.id()}">Đánh dấu hoàn thành</button>
 </c:if>
 <p id="lessonNotice" class="mt-3" role="status"></p>

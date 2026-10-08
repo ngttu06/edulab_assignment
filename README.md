@@ -23,7 +23,7 @@ cd /Users/ngttu/Workspace/project_asm_prj
 docker compose up -d --no-build --wait
 ```
 
-Mặc định bước chuẩn bị DB chỉ validate. Nếu cloud thiếu V15/V16, lệnh dừng trước
+Mặc định bước chuẩn bị DB chỉ validate. Nếu cloud thiếu migration của bản nguồn, lệnh dừng trước
 khi chạy app; sau khi backup và review, đặt `EDULAB_MIGRATE_ON_DEPLOY=true` trong
 `.env.remote` để duyệt job migration riêng. Không sửa schema tự động trong app.
 Compose mặc định chỉ dùng `mysql.ngttu.com:3306/edulab_assignment`, container web
@@ -33,6 +33,13 @@ container database hoặc fallback sang DB local. Image đã có sẵn trong wor
 Cổng mặc định `127.0.0.1:8088`, context `/edulab`; đăng nhập cần HTTPS vì cookie Secure.
 PlayerJS/HLS vẫn cần build hợp lệ của chủ website, không có player giả trong image.
 
+**Cập nhật admin — 09/10/2026 (+07):** container `edulab` đã chạy image admin mới
+trên schema cloud V20, health `UP`/Docker `healthy`; giữ nguyên `.env.remote` và
+volume storage, không áp dụng migration. Public browser smoke đạt. Đăng nhập và
+duyệt admin trên cloud **chưa xác nhận** vì mật khẩu trong file vận hành cũ không
+khớp; không đổi mật khẩu cloud. Chi tiết release/rollback ở
+`/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`.
+
 **Trạng thái triển khai 07/10/2026:** cloud đã được backup/phục hồi thử và nâng
 V15–V16 theo phê duyệt của chủ sở hữu; dữ liệu bảng cũ được giữ nguyên. Container
 `edulab` đang healthy, job `migrate` exit 0, approval thường trực `false`.
@@ -40,6 +47,8 @@ Lỗi Docker Desktop Start do thiếu schema đã được khắc phục; lần 
 lại stack. Đổi biến môi trường thì dùng `docker compose up` thay vì chỉ Start.
 
 ## Chức năng hiện có
+
+- **Cổng quản trị độc lập:** `/admin` có dashboard dữ liệu thật, sidebar riêng, CRUD theo phân hệ, tìm kiếm/phân trang, quản lý giáo viên/lớp/phân công, nội dung, moderation, AI/storage và audit. Xem [phạm vi, safeguards và kiểm thử admin](/Users/ngttu/Workspace/project_asm_prj/docs/admin-portal.md). Không thay đổi schema V20 hay tự triển khai lên cloud.
 
 - **Danh mục khóa học:** trang chủ và `/courses` dùng môn học, khối lớp, số bài, thời lượng và tiến độ từ database; tìm kiếm và lọc theo môn/khối/khóa. Chi tiết khóa học hiển thị chương trình, trạng thái và bài tiên quyết. Không dựng giá bán, đánh giá, thống kê hoặc giáo viên giả.
 - **Tài khoản và phân quyền:** ADMIN, TEACHER, STUDENT, PARENT; đăng ký học sinh/phụ huynh; admin tạo tài khoản và bật/tắt tài khoản. JWT access token 15 phút trong cookie HttpOnly; refresh token ngẫu nhiên, lưu hash SHA-256, thời hạn mặc định 14 ngày và xoay vòng khi dùng. Phát hiện dùng lại refresh token sẽ thu hồi token family liên quan và vô hiệu access token hiện tại của tài khoản. Logout thu hồi mọi phiên của tài khoản, không chỉ thiết bị hiện tại.

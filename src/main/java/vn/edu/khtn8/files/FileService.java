@@ -45,7 +45,7 @@ public class FileService {
         var rows = jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND scan_status='CLEAN'", id);
         if (rows.isEmpty()) throw notFound();
         var file = rows.getFirst();
-        if (((Number)file.get("uploaded_by")).longValue() != user.id() && !forum.canDownload(user, id) && !social.canDownload(user,id)) throw notFound();
+        if (((Number)file.get("uploaded_by")).longValue() != user.id() && !vn.edu.khtn8.school.SchoolService.hasRole(user,"ADMIN") && !forum.canDownload(user, id) && !social.canDownload(user,id)) throw notFound();
         long length=((Number)file.get("size_bytes")).longValue();
         Resource resource;
         if(file.get("storage_profile_id")==null) resource=storage.load((String)file.get("storage_key"));

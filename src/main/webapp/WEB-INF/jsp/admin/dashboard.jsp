@@ -1,0 +1,27 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
+<div class="admin-page-heading"><div><span class="admin-eyebrow">ĐIỀU HÀNH & QUẢN LÝ</span><h1>Tổng quan hệ thống</h1><p>Mọi hoạt động học tập. Một không gian quản trị.</p></div><a class="btn btn-primary" href="${pageContext.request.contextPath}/admin/classes/new"><span aria-hidden="true">＋</span> Tạo lớp học</a></div>
+<section class="admin-kpis" aria-label="Thống kê hệ thống">
+    <c:forEach var="metric" items="${['teachers','students','classes','courses']}" varStatus="loop"><a class="admin-kpi" href="${pageContext.request.contextPath}/admin/${metric}"><div class="admin-kpi-top"><span>${['Giáo viên hoạt động','Học sinh hoạt động','Lớp đang hoạt động','Khóa học'][loop.index]}</span><span class="admin-kpi-icon"><ui:icon name="${['users','user','cap','book'][loop.index]}"/></span></div><strong><c:out value="${overview[metric]}"/></strong><span class="admin-kpi-bottom">Quản lý ${['giáo viên','học sinh','lớp học','khóa học'][loop.index]} <span aria-hidden="true">↗</span></span></a></c:forEach>
+</section>
+<div class="admin-dashboard-grid">
+    <section class="admin-panel admin-dashboard-main"><div class="admin-panel-heading"><div><span class="admin-eyebrow">QUẢN LÝ ĐÀO TẠO</span><h2>Lớp học gần đây</h2></div><a href="${pageContext.request.contextPath}/admin/classes">Tất cả lớp <span aria-hidden="true">→</span></a></div>
+        <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Lớp học</th><th>Giáo viên phụ trách</th><th>Học sinh</th><th><span class="visually-hidden">Chi tiết</span></th></tr></thead><tbody>
+        <c:forEach var="item" items="${overview.classrooms}"><tr><td><a class="admin-cell-title" href="${pageContext.request.contextPath}/admin/classes/${item.id}"><c:out value="${item.name}"/></a><small><c:out value="${item.academic_year}"/></small></td><td><c:choose><c:when test="${empty item.teachers}"><span class="admin-badge warning">Chưa phân công</span></c:when><c:otherwise><c:out value="${item.teachers}"/></c:otherwise></c:choose></td><td>${item.students}</td><td><a class="admin-row-link" href="${pageContext.request.contextPath}/admin/classes/${item.id}" aria-label="Chi tiết lớp ${item.id}">→</a></td></tr></c:forEach>
+        <c:if test="${empty overview.classrooms}"><tr><td colspan="4" class="admin-empty">Chưa có lớp học. Tạo lớp đầu tiên để bắt đầu.</td></tr></c:if>
+        </tbody></table></div>
+    </section>
+    <section class="admin-panel admin-attention"><div class="admin-panel-heading"><div><span class="admin-eyebrow">CẦN CHÚ Ý</span><h2>Việc cần xử lý</h2></div><span class="admin-attention-dot"></span></div>
+        <a class="admin-task" href="${pageContext.request.contextPath}/admin/teaching-assignments"><span class="admin-task-icon"><ui:icon name="users"/></span><span><strong>Phân công giáo viên</strong><small>Đảm bảo mỗi lớp đều có người phụ trách</small></span><span aria-hidden="true">→</span></a>
+        <c:forEach var="item" items="${overview.unassigned}"><a class="admin-unassigned" href="${pageContext.request.contextPath}/admin/classes/${item.id}"><c:out value="${item.name}"/><span class="admin-badge warning">Chưa có giáo viên</span></a></c:forEach>
+        <c:if test="${empty overview.unassigned}"><p class="admin-task-note">Tất cả lớp đang hoạt động đã có giáo viên.</p></c:if>
+        <a class="admin-task" href="${pageContext.request.contextPath}/admin/lessons"><span class="admin-task-icon"><ui:icon name="book"/></span><span><strong>${overview.drafts} bài học bản nháp</strong><small>Kiểm tra nội dung trước khi xuất bản</small></span><span aria-hidden="true">→</span></a>
+        <a class="admin-task" href="${pageContext.request.contextPath}/admin/community/reports"><span class="admin-task-icon"><ui:icon name="chat"/></span><span><strong>${overview.reports} báo cáo cộng đồng</strong><small>Kiểm duyệt và giữ môi trường an toàn</small></span><span aria-hidden="true">→</span></a>
+    </section>
+    <section class="admin-panel"><div class="admin-panel-heading"><div><span class="admin-eyebrow">NHẬT KÝ HỆ THỐNG</span><h2>Hoạt động gần đây</h2></div><a href="${pageContext.request.contextPath}/admin/audit-logs">Xem tất cả →</a></div><div class="admin-timeline">
+        <c:forEach var="event" items="${overview.recent}"><div class="admin-timeline-item"><span class="admin-timeline-dot"></span><div><strong><c:out value="${event.actor_name}" default="Hệ thống"/></strong><p><c:out value="${event.action}"/> · <c:out value="${event.resource_type}"/> #<c:out value="${event.resource_id}"/></p></div><time><c:out value="${event.created_at}"/></time></div></c:forEach>
+        <c:if test="${empty overview.recent}"><p class="admin-empty">Chưa có hoạt động được ghi nhận.</p></c:if>
+    </div></section>
+    <section class="admin-quick-panel"><span class="admin-eyebrow">THAO TÁC NHANH</span><h2>Sẵn sàng cho<br>buổi học tiếp theo.</h2><p>Tạo tài khoản, chuẩn bị nội dung và kết nối giáo viên với lớp học.</p><a href="${pageContext.request.contextPath}/admin/teachers/new"><ui:icon name="users"/>Thêm giáo viên <span>＋</span></a><a href="${pageContext.request.contextPath}/admin/teaching-assignments"><ui:icon name="cap"/>Phân công giảng dạy <span>→</span></a><a href="${pageContext.request.contextPath}/admin/lessons/new"><ui:icon name="book"/>Tạo bài học <span>＋</span></a></section>
+</div>

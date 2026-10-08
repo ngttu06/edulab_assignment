@@ -59,7 +59,7 @@ public class TeacherWorkspaceController {
         if(section.equals("results")) model.addAttribute("results",insights.results(user,id));
         return page(model,"class-results",section.equals("progress")?"Tiến độ bài học":"Kết quả quiz");
     }
-    @GetMapping(value="/teacher/classes/{id}/results.csv",produces="text/csv;charset=UTF-8")
+    @GetMapping(value={"/teacher/classes/{id}/results.csv","/admin/classes/{id}/results.csv"},produces="text/csv;charset=UTF-8")
     @ResponseBody
     public org.springframework.http.ResponseEntity<byte[]> exportResults(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id) {
         var rows=insights.results(user,id);

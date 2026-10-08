@@ -1,0 +1,6 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<nav class="admin-pagination" aria-label="Phân trang"><span>${listing.total()} bản ghi · Trang ${listing.page()+1} / ${listing.pages()}</span><div>
+<c:if test="${listing.page() > 0}"><c:url var="previous" value=""><c:param name="search" value="${search}"/><c:param name="state" value="${empty state ? 'all' : state}"/><c:param name="sort" value="${empty sort ? 'newest' : sort}"/><c:param name="page" value="${listing.page()-1}"/></c:url><a class="btn btn-outline-secondary btn-sm" href="<c:out value='${previous}'/>">← Trang trước</a></c:if>
+<c:if test="${listing.page()+1 < listing.pages()}"><c:url var="next" value=""><c:param name="search" value="${search}"/><c:param name="state" value="${empty state ? 'all' : state}"/><c:param name="sort" value="${empty sort ? 'newest' : sort}"/><c:param name="page" value="${listing.page()+1}"/></c:url><a class="btn btn-outline-secondary btn-sm" href="<c:out value='${next}'/>">Trang sau →</a></c:if>
+</div></nav>

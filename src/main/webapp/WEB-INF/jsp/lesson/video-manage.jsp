@@ -1,6 +1,6 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<span class="eyebrow">KHÔNG GIAN GIÁO VIÊN</span><h1 class="h3">Video bài học</h1>
+<span class="${adminVideo ? 'admin-eyebrow' : 'eyebrow'}">${adminVideo ? 'NỘI DUNG & HỌC TẬP' : 'KHÔNG GIAN GIÁO VIÊN'}</span><h1 class="h3">Video bài học</h1>
 <p class="text-muted">Mỗi bài có một video chính. Giáo viên chỉ quản lý bài được admin phân công; học sinh xem video của bài đã xuất bản.</p>
 <c:if test="${not playerAvailable}"><div class="alert alert-warning">PlayerJS chưa được cài tại <code><c:out value="${playerPath}"/></code>. Admin cần cài bản miễn phí từ PlayerJS Builder, bật HLS và API Events. YouTube vẫn sử dụng được.</div></c:if>
 <p class="small text-muted">Domain m3u8 được phép: <c:choose><c:when test="${empty videoHosts}">chưa cấu hình (EDULAB_VIDEO_ALLOWED_HOSTS)</c:when><c:otherwise><c:out value="${videoHosts}"/></c:otherwise></c:choose>. Manifest, segment và khóa HLS cần HTTPS/CORS phù hợp; không hỗ trợ livestream không có thời lượng cố định.</p>

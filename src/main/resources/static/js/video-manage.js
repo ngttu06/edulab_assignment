@@ -5,7 +5,8 @@
     const lesson = document.getElementById('videoLesson'), notice = document.getElementById('videoManageNotice');
     const provider = document.getElementById('videoProvider'), url = document.getElementById('videoUrl');
     let preview, previewTimer, generation = 0;
-    const endpoint = () => '/api/v1/teacher/lessons/'+lesson.value+'/video';
+    const scope = document.body.classList.contains('admin-body') ? 'admin' : 'teacher';
+    const endpoint = () => '/api/v1/'+scope+'/lessons/'+lesson.value+'/video';
     function stopPreview() {
         generation++; clearInterval(previewTimer); preview?.destroy(); preview=null;
         const holder = document.getElementById('videoPreview'); holder.replaceChildren();
@@ -50,7 +51,7 @@
         stopPreview(); const ticket=generation, text=document.getElementById('previewNotice');
         try {
             if (!lesson.value) throw new Error('Hãy chọn bài học trước.');
-            const source=await window.edulab.api('/api/v1/teacher/videos/validate',{method:'POST',body:{provider:provider.value,sourceUrl:url.value.trim(),durationSeconds:1,completionThreshold:95}});
+            const source=await window.edulab.api('/api/v1/'+scope+'/videos/validate',{method:'POST',body:{provider:provider.value,sourceUrl:url.value.trim(),durationSeconds:1,completionThreshold:95}});
             text.textContent='Đang tải video xem thử…';
             const nextPreview=await window.edulabVideoPlayer.create({id:'previewPlayer',provider:provider.value,
                 sourceUrl:source.url,youtubeId:source.youtubeId,

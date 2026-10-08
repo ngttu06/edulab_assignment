@@ -35,21 +35,28 @@ public class LessonVideoController {
         model.addAttribute("playerPath",policy.playerPath());
         return page(model,"lesson/video-manage","Quản lý video bài học");
     }
+    @GetMapping("/admin/videos")
+    public String adminManage(@AuthenticationPrincipal AuthenticatedUser user,Model model) {
+        SchoolService.require(user,"ADMIN");manage(user,model);
+        model.addAttribute("adminTitle","Video bài học");model.addAttribute("adminActive","videos");
+        model.addAttribute("adminNavigation",vn.edu.khtn8.administration.AdminResources.all());
+        model.addAttribute("adminVideo",true);return "layout/admin";
+    }
     @GetMapping("/api/v1/lessons/{id}/video/progress") @ResponseBody
     public Progress progress(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user) { return videos.progress(user,id); }
     @PostMapping("/api/v1/lessons/{id}/video/sessions") @ResponseBody
     public Session session(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user) { return videos.begin(user,id); }
     @PostMapping("/api/v1/lessons/{id}/video/progress") @ResponseBody
     public Progress report(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody Report input) { return videos.report(user,id,input); }
-    @GetMapping("/api/v1/teacher/lessons/{id}/video") @ResponseBody
+    @GetMapping({"/api/v1/teacher/lessons/{id}/video","/api/v1/admin/lessons/{id}/video"}) @ResponseBody
     public java.util.Map<String,Object> configuration(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user) { return videos.configuration(user,id); }
-    @PostMapping("/api/v1/teacher/videos/validate") @ResponseBody
+    @PostMapping({"/api/v1/teacher/videos/validate","/api/v1/admin/videos/validate"}) @ResponseBody
     public VideoPolicy.Source validate(@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody Input input) {
         SchoolService.require(user,"TEACHER","ADMIN"); return policy.validate(input.provider(),input.sourceUrl());
     }
-    @PutMapping("/api/v1/teacher/lessons/{id}/video") @ResponseBody
+    @PutMapping({"/api/v1/teacher/lessons/{id}/video","/api/v1/admin/lessons/{id}/video"}) @ResponseBody
     public Video save(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody Input input) { return videos.save(user,id,input); }
-    @DeleteMapping("/api/v1/teacher/lessons/{id}/video") @ResponseBody
+    @DeleteMapping({"/api/v1/teacher/lessons/{id}/video","/api/v1/admin/lessons/{id}/video"}) @ResponseBody
     public void remove(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user) { videos.remove(user,id); }
     @PutMapping("/api/v1/admin/lessons/{id}/video-teacher") @ResponseBody
     public void assign(@PathVariable long id,@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody Editor input) { videos.assign(user,id,input.teacherId()); }

@@ -27,9 +27,6 @@ public class AdminController {
         public QuizInput(String title,Long lessonId,int durationMinutes,int maxAttempts,List<Long> questionIds){this(title,lessonId,durationMinutes,maxAttempts,questionIds,"PRACTICE",null);}
     }
     public record State(boolean enabled) {}
-    @GetMapping("/admin") public String index(@AuthenticationPrincipal AuthenticatedUser user,Model model) {
-        model.addAttribute("data",service.data(user));model.addAttribute("pageTitle","Quản trị · EduLab");model.addAttribute("contentPage","/WEB-INF/jsp/admin/index.jsp");return "layout/default";
-    }
     @PostMapping("/api/v1/admin/users") @ResponseBody public Map<String,Long> user(@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody UserInput input) { return Map.of("id",service.createUser(user,input)); }
     @PostMapping("/api/v1/admin/users/{id}/state") @ResponseBody public void state(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id,@RequestBody State input) {service.enableUser(user,id,input.enabled());}
     @PostMapping("/api/v1/admin/lessons") @ResponseBody public Map<String,Long> lesson(@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody LessonInput input) {return Map.of("id",service.createLesson(user,input));}

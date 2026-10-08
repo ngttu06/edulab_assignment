@@ -73,10 +73,12 @@ public class SecurityConfig {
                             Object original=request.getAttribute("jakarta.servlet.forward.request_uri");
                             String uri=original instanceof String value ? value : request.getRequestURI();
                             String route=uri.substring(request.getContextPath().length());
-                            boolean videoPage=route.matches("/lessons/[0-9]+/video") || route.equals("/teacher/videos");
+                            boolean videoPage=route.matches("/lessons/[0-9]+/video") || route.equals("/teacher/videos") || route.equals("/admin/videos");
                             response.setHeader("Content-Security-Policy",videoPage ? videoCsp : route.equals("/community") || route.startsWith("/community/posts/") ? communityCsp : baseCsp);
                             response.setHeader("Referrer-Policy",videoPage ? "strict-origin-when-cross-origin" : "same-origin");
                             if (route.contains("/video") || route.equals("/teacher/videos")) response.setHeader("Cache-Control","private, no-store");
+                            if (route.equals("/admin") || route.startsWith("/admin/")) response.setHeader("Cache-Control","private, no-store");
+                            if (route.startsWith("/api/v1/admin/workspace/")) response.setHeader("Cache-Control","private, no-store");
                         })
                         .contentTypeOptions(contentTypeOptions -> {})
                         .frameOptions(frame -> frame.deny()))

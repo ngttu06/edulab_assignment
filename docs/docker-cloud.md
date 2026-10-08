@@ -47,10 +47,10 @@ Docker không đóng gói/migrate dữ liệu cloud, không thay cấu hình R2/
 
 ## 2. Schema và migration
 
-Cloud `mysql.ngttu.com/edulab_assignment` đã được nâng **V19** ngày 08/10/2026 theo
-phê duyệt riêng, sau backup/phục hồi thử (xem lịch sử bên dưới). Source hiện có
-V1–V20. Bản V20 cần sao lưu cloud, kiểm tra
-history/checksum và diễn tập staging trước khi nâng cấp. Không sửa file migration
+Cloud `mysql.ngttu.com/edulab_assignment` hiện có **V20**, đã được validate trong
+lượt triển khai admin ngày 09/10/2026 (+07). Source hiện có V1–V20; lượt admin không
+thay schema hoặc áp dụng migration. Mỗi lần nâng schema tiếp theo cần sao lưu cloud,
+kiểm tra history/checksum và diễn tập staging trước khi nâng cấp. Không sửa file migration
 đã áp dụng. MySQL DDL không bảo đảm rollback nguyên transaction; backup là bắt buộc.
 
 Job `migrate` mặc định **chỉ validate**, không migrate. Nếu có pending migrations,
@@ -94,7 +94,7 @@ Mặc định image `edulab-khtn8:latest`, port **127.0.0.1:8088**, context **/e
 Workspace đã có image, container `edulab` được tạo sẵn với đủ biến runtime. Máy
 chưa có image hoặc source đã đổi thì thay `--no-build` bằng `--build`. Không dùng
 Docker Desktop chạy image trần mà bỏ env: nó không có secret mặc định bên trong.
-Container hiện **đang chạy healthy** với schema cloud V16. Dùng Compose để khởi
+Container hiện **đang chạy healthy** với schema cloud V20. Dùng Compose để khởi
 động các lần sau, không `docker start edulab` riêng để bỏ qua kiểm tra dependency.
 Nếu build lâu/startup chậm, thêm `--wait-timeout 180`. Lần đầu cần internet tải base
 images và Maven dependencies. Build không chạy test hoặc kết nối cloud; test chạy
@@ -374,3 +374,56 @@ Sau rollback, tiếp tục chỉ định image này cho các lệnh Compose; kh�
 `latest` nếu tag đó đã trỏ V20. Xem report của lần phát hành để biết image ID,
 commit và trạng thái triển khai thực tế. ClamAV và dọn ảnh R2 mồ côi vẫn là
 công việc riêng, không bật scan bypass để thay thế.
+
+## Triển khai cổng admin — 09/10/2026 (+07)
+
+Lượt triển khai được chủ sở hữu phê duyệt, release timestamp UTC 08/10/2026:
+
+- Image release: `edulab-khtn8:admin-20261008t170809z-12e2d93359c6`, đồng thời tag `latest`.
+  Image ID: `sha256:b941bcf8234d402234c987b9237030f0bb2b65d27829a758d80928ce0e95f34a`.
+- Rollback: `edulab-khtn8:before-admin-20261008t170809z`, image ID
+  `sha256:eece8fdd2ef5684351d61e83c8c3c24ac0a5399493b87095c0701d150706eebd`.
+  Đây là phát hành từ worktree có thay đổi chưa commit; nhãn revision Git là base
+  commit, không đại diện riêng toàn bộ nguồn release. Report lưu source hash và
+  đối chiếu byte-for-byte 132 file JSP/static/migration trong WAR.
+- Cloud MySQL vẫn dùng TLS `VERIFY_IDENTITY`; probe kết nối thật có TLS cipher.
+  Validate 20 migration thành công, không pending migration. Job Compose `migrate`
+  chỉ validate, exit 0; không áp dụng migration/repair/clean/baseline/import.
+- `edulab` dùng UID 10001, bind `127.0.0.1:8088`, Docker `healthy` và health `UP`.
+  Biến môi trường, `.env.remote` (0600), secrets/khóa mã hóa, volume
+  `edulab_app-storage`, port và cấu hình giảm quyền đều giữ nguyên.
+- Snapshot container trước và bản sao `.env.remote` được bảo vệ riêng tư; **không
+  tạo dump database mới trong lượt không đổi schema này**. Fingerprint trước–sau
+  khớp 10 bảng lớp học/nội dung đã chọn, không chứng minh toàn bộ DB bất biến.
+  Scheduled jobs vẫn chạy; một lần login thất bại có thể ghi auth/audit metadata.
+- Đã xác nhận bằng chứng Maven **240 tests, 0 failures/errors/skipped** và browser
+  admin **24 phân hệ, 1440/768/390/320px** trên DB dùng một lần. Chạy lại 5 test
+  Compose, syntax check 26 file JavaScript và `git diff --check` đều đạt. Public
+  browser smoke trên cloud đạt ở 1440/390px, không lỗi JavaScript/tràn ngang.
+- **Admin cloud chưa được kiểm chứng sau đăng nhập:** thông tin đăng nhập lưu cũ
+  trả 401; probe chỉ đọc xác nhận tài khoản ADMIN vẫn enabled nhưng mật khẩu lưu
+  không khớp hash cloud. Không đổi/reset mật khẩu, không tạo tài khoản, không thử
+  CRUD/upload/AI, không logout để tránh thu hồi các phiên quản trị đang dùng.
+  Cookie authenticated, dashboard, navigation và detail/form admin cloud chưa xác nhận.
+  Bản mới được giữ vì health/public checks đạt và lỗi đã xác định là credential cũ,
+  không phải bằng chứng lỗi release. Chủ sở hữu cần kiểm tra bằng mật khẩu hiện tại
+  qua HTTPS trước khi coi authenticated smoke hoàn tất.
+- Proxy HTTPS test-only trên loopback đã tắt; không cấu hình domain/certificate
+  hoặc HTTPS công khai mới. Cookie Secure và scan bypass false vẫn giữ nguyên.
+- Bằng chứng, report và lệnh rollback riêng tư:
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/admin-20261008T170809Z/`.
+  Không đưa thư mục này, backup env hoặc output inspect/config chưa che secrets vào Git.
+
+Rollback **chỉ ứng dụng**, không hạ schema hoặc khôi phục đè DB/volume:
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:before-admin-20261008t170809z docker compose \
+  --project-directory /Users/ngttu/Workspace/project_asm_prj \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+curl -fsS http://127.0.0.1:8088/edulab/actuator/health
+```
+
+Sau rollback, tiếp tục chỉ định `EDULAB_IMAGE` rollback cho các lệnh Compose;
+`latest` vẫn trỏ release admin mới trừ khi chủ sở hữu chủ động đổi tag. Không dùng
+`down -v`, không xoay secrets hoặc phục hồi database chỉ để rollback ứng dụng.

@@ -69,7 +69,8 @@ public class AdminService {
         if (publish && jdbc.queryForList("SELECT id FROM lesson_versions WHERE lesson_id=?",id).isEmpty()) throw bad("Bài học chưa có nội dung.");
         String status=publish?"PUBLISHED":"ARCHIVED";
         if(jdbc.update("UPDATE lessons SET status=? WHERE id=? AND deleted_at IS NULL",status,id)==0) throw bad("Bài học không tồn tại hoặc đã xóa.");
-        jdbc.update("UPDATE lesson_versions SET status=? WHERE lesson_id=?",status,id);
+        jdbc.update("UPDATE lesson_versions SET status='ARCHIVED' WHERE lesson_id=?",id);
+        jdbc.update("UPDATE lesson_versions SET status=? WHERE lesson_id=? AND version_number=(SELECT v FROM (SELECT MAX(version_number) v FROM lesson_versions WHERE lesson_id=?) latest)",status,id,id);
         audit(actor,publish?"PUBLISH_LESSON":"ARCHIVE_LESSON","lesson",id);
     }
 

@@ -92,7 +92,9 @@ public class SocialCommunityController {
         SchoolService.require(user,"ADMIN");model.addAttribute("reports",social.reports(user));
         model.addAttribute("pageTitle","Báo cáo cộng đồng · EduLab");
         model.addAttribute("contentPage","/WEB-INF/jsp/community/reports.jsp");
-        return "layout/default";
+        model.addAttribute("adminTitle","Báo cáo vi phạm");model.addAttribute("adminActive","reports");
+        model.addAttribute("adminNavigation",vn.edu.khtn8.administration.AdminResources.all());
+        return "layout/admin";
     }
     @GetMapping("/api/v1/admin/community/reports") @ResponseBody
     public List<Map<String,Object>> reportsApi(@AuthenticationPrincipal AuthenticatedUser user) {return social.reports(user);}

@@ -1,0 +1,24 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
+<a class="admin-back-link" href="${pageContext.request.contextPath}/admin/${resource.key()}">← <c:out value="${resource.title()}"/></a>
+<div class="admin-page-heading"><div><span class="admin-eyebrow"><c:out value="${resource.group()}"/></span><h1>${editing ? 'Chỉnh sửa' : 'Thêm mới'} · <c:out value="${resource.title()}"/></h1><p>Các trường có dấu * là bắt buộc. Thay đổi được kiểm tra và ghi nhật ký.</p></div><c:if test="${editing}"><span class="admin-badge">ID #${item.id}</span></c:if></div>
+<form id="adminResourceForm" data-resource="${resource.key()}" data-id="${item.id}" class="admin-form-layout">
+    <section class="admin-panel admin-form-panel"><div class="admin-panel-heading"><h2>Thông tin ${editing ? 'bản ghi' : 'mới'}</h2></div><div class="admin-fields">
+    <c:forEach var="field" items="${resource.fields()}"><div class="admin-field ${field.type() == 'textarea' or field.type() == 'multiple' ? 'admin-field-wide' : ''}">
+        <c:choose>
+        <c:when test="${field.type() == 'reference' or field.type() == 'multiple'}"><ui:adminReference name="${field.key()}" label="${field.label()}" resource="${field.reference()}" multiple="${field.type() == 'multiple'}" required="${field.required()}" selected="${selectedOptions[field.key()]}"/></c:when>
+        <c:otherwise><label class="form-label" for="field-${field.key()}"><c:out value="${field.label()}"/>${field.required() ? ' *' : ''}</label>
+        <c:choose>
+            <c:when test="${field.type() == 'textarea'}"><textarea class="form-control" id="field-${field.key()}" name="${field.key()}" rows="${field.key() == 'content_html' ? 12 : 4}" maxlength="${field.max()}" ${field.required() ? 'required' : ''}><c:out value="${item[field.key()]}"/></textarea></c:when>
+            <c:when test="${field.type() == 'select'}"><select class="form-select" id="field-${field.key()}" name="${field.key()}" required><c:forEach var="option" items="${field.choices()}"><option value="${option}" ${item[field.key()] == option ? 'selected' : ''}><c:out value="${option}"/></option></c:forEach></select></c:when>
+            <c:when test="${field.type() == 'boolean'}"><select class="form-select" id="field-${field.key()}" name="${field.key()}" data-value-type="boolean"><option value="true" ${item[field.key()] == true ? 'selected' : ''}>Có</option><option value="false" ${item[field.key()] == false ? 'selected' : ''}>Không</option></select></c:when>
+            <c:when test="${field.type() == 'datetime-local'}"><input class="form-control" id="field-${field.key()}" name="${field.key()}" type="datetime-local" data-instant="<c:out value='${item[field.key()]}'/>" ${field.required() ? 'required' : ''}></c:when>
+            <c:when test="${field.type() == 'password'}"><input class="form-control" id="field-${field.key()}" name="${field.key()}" type="password" autocomplete="new-password" minlength="8" maxlength="72" ${not editing ? 'required' : ''}></c:when>
+            <c:otherwise><input class="form-control" id="field-${field.key()}" name="${field.key()}" type="${field.type()}" value="<c:out value='${item[field.key()]}'/>" ${field.required() ? 'required' : ''} <c:if test="${field.type() == 'number'}">min="${field.key() == 'display_order' or field.key() == 'required_score' ? 0 : 1}" max="${field.max()}" step="${field.key() == 'required_score' ? '0.01' : '1'}" data-value-type="number"</c:if> <c:if test="${field.max() > 0 and field.type() != 'number'}">maxlength="${field.max()}"</c:if>></c:otherwise>
+        </c:choose><c:if test="${not empty field.help()}"><small class="admin-field-help"><c:out value="${field.help()}"/></small></c:if></c:otherwise>
+        </c:choose>
+    </div></c:forEach>
+    </div><div class="admin-form-actions"><a class="btn btn-outline-secondary" href="${pageContext.request.contextPath}/admin/${resource.key()}">Hủy thay đổi</a><button class="btn btn-primary" type="submit">${editing ? 'Lưu thay đổi' : 'Tạo mới'}</button></div></section>
+    <aside class="admin-form-aside"><span class="admin-form-aside-icon"><ui:icon name="settings"/></span><h2>Quản trị có kiểm soát</h2><p>Bạn đang thao tác với dữ liệu toàn hệ thống. Hãy kiểm tra thông tin trước khi lưu.</p><ul><li>Không dùng thông tin cá nhân thật để thử nghiệm.</li><li>Các trường liên kết có tìm kiếm theo tên.</li><li>Nội dung HTML được lọc trên máy chủ.</li><li>Đổi thông tin tài khoản sẽ thu hồi các phiên đăng nhập của tài khoản đó.</li></ul></aside>
+</form>

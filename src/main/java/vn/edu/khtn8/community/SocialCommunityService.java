@@ -252,6 +252,8 @@ public class SocialCommunityService {
     @Transactional
     public void resolveReports(AuthenticatedUser user,long id) {
         SchoolService.require(user,"ADMIN");
+        // Preserve evidence before removing reports from the open queue.
+        jdbc.update("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id,metadata_json) SELECT ?,'ARCHIVE_COMMUNITY_REPORT','community_post',CAST(post_id AS CHAR),JSON_OBJECT('reporterId',reporter_id,'reason',reason,'reportedAt',created_at) FROM community_reports WHERE post_id=?",user.id(),id);
         if(jdbc.update("DELETE FROM community_reports WHERE post_id=?",id)==0) throw missing();
         jdbc.update("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,'RESOLVE_COMMUNITY_REPORT','community_post',?)",user.id(),String.valueOf(id));
     }

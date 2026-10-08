@@ -58,6 +58,12 @@ class ImagePreviewTest {
         when(storage.load("local")).thenReturn(new ByteArrayResource(new byte[png.length]));
         assertThrows(ResponseStatusException.class,()->files.image(owner,7));
     }
+    @Test void adminCanReviewCleanOrphanFilesButCannotDownloadBlockedFiles() throws Exception {
+        var admin=new AuthenticatedUser(3L,"admin","Admin","unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        fixture("one.png","image/png",png);assertNotNull(files.download(admin,7));
+        when(jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND scan_status='CLEAN'",7L)).thenReturn(List.of());
+        assertThrows(ResponseStatusException.class,()->files.download(admin,7));
+    }
     @Test void allowedJpegAndWebpSignaturesUseTheirVerifiedMimeTypes() throws Exception {
         fixture("one.jpg","image/jpeg",new byte[]{(byte)255,(byte)216,(byte)255,1});
         assertEquals("image/jpeg",files.image(owner,7).contentType());

@@ -1,0 +1,4 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<div class="admin-page-heading"><div><span class="admin-eyebrow">CẤU HÌNH HỆ THỐNG</span><h1><c:out value="${adminTitle}"/></h1><p>Cấu hình riêng tư. Khóa bí mật không được hiển thị lại hoặc ghi vào nhật ký.</p></div></div>
+<c:choose><c:when test="${settingsKind == 'ai'}"><jsp:include page="/WEB-INF/jsp/admin/ai-settings.jsp"/><script src="${pageContext.request.contextPath}/js/admin-ai.js" defer></script></c:when><c:otherwise><jsp:include page="/WEB-INF/jsp/admin/storage-settings.jsp"/><script src="${pageContext.request.contextPath}/js/file-upload.js" defer></script><script src="${pageContext.request.contextPath}/js/admin-storage.js" defer></script></c:otherwise></c:choose>

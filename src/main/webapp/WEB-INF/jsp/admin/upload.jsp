@@ -1,0 +1,7 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<a class="admin-back-link" href="${pageContext.request.contextPath}/admin/files">← Tài liệu & tệp tải lên</a>
+<div class="admin-page-heading"><div><span class="admin-eyebrow">NỘI DUNG & HỌC TẬP</span><h1>Tải tài liệu lên</h1><p>Tệp được tải trực tiếp vào kho riêng tư và kiểm tra an toàn trước khi cho phép tải xuống.</p></div></div>
+<section class="admin-panel"><div class="admin-panel-heading"><h2>Chọn tệp tài liệu</h2></div>
+<form id="adminUploadForm" class="admin-fields"><div class="admin-field-wide"><label for="adminUploadFiles" class="form-label">Tệp ảnh hoặc PDF *</label><input id="adminUploadFiles" type="file" class="form-control" accept="image/jpeg,image/png,image/webp,application/pdf" multiple required><p class="admin-field-help">Tối đa 3 tệp mỗi lần. Ảnh JPG/PNG/WebP tối đa 5 MB, PDF tối đa 10 MB. Cần cấu hình R2 và scanner; không bỏ qua bước kiểm tra.</p><p id="adminUploadStatus" role="status" aria-live="polite"></p></div><div class="admin-field-wide"><button type="submit" class="btn btn-primary">Tải lên & kiểm tra</button><button id="adminUploadCancel" type="button" class="btn btn-outline-secondary" hidden>Hủy tải lên</button></div></form></section>
+<script src="${pageContext.request.contextPath}/js/file-upload.js" defer></script>
+<script src="${pageContext.request.contextPath}/js/admin-upload.js" defer></script>

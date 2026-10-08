@@ -16,12 +16,14 @@ public class QuizService {
     private final QuizRepository quizzes;
     public QuizService(QuizRepository quizzes) { this.quizzes = quizzes; }
     public List<Quiz> list() { return quizzes.list(); }
+    public List<Quiz> list(long userId) { return quizzes.list(userId); }
 
     @Transactional
     @PreAuthorize("hasRole('STUDENT')")
     public AttemptView start(long studentId, long quizId) {
         quizzes.lockStudent(studentId);
-        Quiz quiz = quizzes.list().stream().filter(q -> q.id() == quizId).findFirst().orElseThrow(QuizService::notFound);
+        quizzes.lockQuiz(quizId);
+        Quiz quiz = quizzes.list(studentId).stream().filter(q -> q.id() == quizId).findFirst().orElseThrow(QuizService::notFound);
         if("TEST".equals(quiz.mode()) && (quiz.revealAfter()==null || !Instant.now().plus(quiz.durationMinutes(),ChronoUnit.MINUTES).isBefore(quiz.revealAfter())))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"Đã quá thời điểm bắt đầu bài kiểm tra trước lịch công bố đáp án.");
         var active = quizzes.active(studentId, quizId);

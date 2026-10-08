@@ -40,13 +40,17 @@ public class SchoolService {
                 """, hasRole(user, "ADMIN"), user.id());
     }
     public List<Map<String, Object>> students(AuthenticatedUser user, long classId) {
-        require(user, "TEACHER", "ADMIN");
-        if (!hasRole(user, "ADMIN") && !exists("SELECT EXISTS(SELECT 1 FROM class_teachers WHERE classroom_id=? AND teacher_id=?)", classId, user.id()))
-            throw new AccessDeniedException("Class not assigned");
+        authorizeClass(user,classId);
         return jdbc.queryForList("""
                 SELECT u.id,u.full_name FROM class_enrollments e JOIN users u ON u.id=e.student_id
                 WHERE e.classroom_id=? AND e.active=TRUE AND u.role='STUDENT' ORDER BY u.full_name,u.id
                 """, classId);
+    }
+    public void authorizeClass(AuthenticatedUser user,long classId) {
+        require(user, "TEACHER", "ADMIN");
+        if (!hasRole(user, "ADMIN") && !exists("SELECT EXISTS(SELECT 1 FROM class_teachers WHERE classroom_id=? AND teacher_id=?)", classId, user.id()))
+            throw new AccessDeniedException("Class not assigned");
+        if(!exists("SELECT EXISTS(SELECT 1 FROM classrooms WHERE id=?)",classId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy lớp học.");
     }
     public void authorizeStudent(AuthenticatedUser user, long studentId) {
         if (hasRole(user, "ADMIN") || (hasRole(user, "STUDENT") && user.id() == studentId)) return;
@@ -61,8 +65,17 @@ public class SchoolService {
         authorizeStudent(user, studentId);
         var students = jdbc.queryForList("SELECT id,full_name FROM users WHERE id=? AND role='STUDENT'", studentId);
         if (students.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy học sinh.");
-        return Map.of("student", students.getFirst(), "summary", lessons.progressSummary(studentId), "lessons", lessons.findPublishedForStudent(studentId),
-                "attempts", jdbc.queryForList("SELECT id,title_snapshot title,score,submitted_at,expired FROM quiz_attempts WHERE student_id=? AND status='GRADED' ORDER BY id DESC LIMIT 100", studentId));
+        var visibleLessons=lessons.findPublishedForStudent(studentId);
+        String attemptScope="";
+        if(hasRole(user,"TEACHER") && !hasRole(user,"ADMIN")) {
+            var ids=new java.util.HashSet<>(jdbc.queryForList("SELECT l.id FROM lessons l WHERE "+ContentAccess.lesson("l",user.id()),Long.class));
+            visibleLessons=visibleLessons.stream().filter(l->ids.contains(l.id())).toList();
+            attemptScope=" AND "+ContentAccess.quiz("q",user.id());
+        }
+        var summary=Map.of("total_lessons",visibleLessons.size(),"completed_lessons",visibleLessons.stream().filter(l->"COMPLETED".equals(l.progressStatus())).count(),
+                "completion_percent",Math.round(visibleLessons.stream().mapToInt(l->l.completionPercent()).average().orElse(0)));
+        return Map.of("student", students.getFirst(), "summary", summary, "lessons", visibleLessons,
+                "attempts", jdbc.query("SELECT a.id,a.title_snapshot title,a.score,a.submitted_at,a.expired FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id WHERE a.student_id=? AND a.status='GRADED'"+attemptScope+" ORDER BY a.id DESC LIMIT 100",new vn.edu.khtn8.common.jdbc.BooleanColumnMapRowMapper("expired"),studentId));
     }
     public List<Map<String, Object>> links(AuthenticatedUser user) {
         require(user, "PARENT", "STUDENT");

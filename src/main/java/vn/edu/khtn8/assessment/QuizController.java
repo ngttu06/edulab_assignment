@@ -17,10 +17,10 @@ public class QuizController {
     public QuizController(QuizService service,vn.edu.khtn8.content.service.LearningPathService path,vn.edu.khtn8.content.service.CatalogService catalog) { this.service = service;this.path=path;this.catalog=catalog; }
 
     @GetMapping("/quizzes")
-    public String list(Model model,@ModelAttribute("filter") vn.edu.khtn8.content.dto.CatalogFilter filter) {
+    public String list(Model model,@AuthenticationPrincipal AuthenticatedUser user,@ModelAttribute("filter") vn.edu.khtn8.content.dto.CatalogFilter filter) {
         vn.edu.khtn8.content.web.CatalogController.filters(model,catalog,0);
         var ids=new java.util.HashSet<>(catalog.quizIds(filter));
-        model.addAttribute("quizzes", service.list().stream().filter(q->ids.contains(q.id())).toList());
+        model.addAttribute("quizzes", service.list(user.id()).stream().filter(q->ids.contains(q.id())).toList());
         model.addAttribute("pageTitle", "Luyện tập · EduLab");
         model.addAttribute("contentPage", "/WEB-INF/jsp/quiz/list.jsp");
         return "layout/default";
@@ -33,9 +33,9 @@ public class QuizController {
         return "layout/default";
     }
     @GetMapping("/api/v1/quizzes") @ResponseBody
-    public List<Quiz> apiList(@ModelAttribute vn.edu.khtn8.content.dto.CatalogFilter filter) {
+    public List<Quiz> apiList(@AuthenticationPrincipal AuthenticatedUser user,@ModelAttribute vn.edu.khtn8.content.dto.CatalogFilter filter) {
         var ids=new java.util.HashSet<>(catalog.quizIds(filter));
-        return service.list().stream().filter(q->ids.contains(q.id())).toList();
+        return service.list(user.id()).stream().filter(q->ids.contains(q.id())).toList();
     }
     @PostMapping("/api/v1/quizzes/{id}/attempts") @ResponseBody
     public AttemptView start(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) {

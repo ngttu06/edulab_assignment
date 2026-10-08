@@ -11,10 +11,11 @@ import vn.edu.khtn8.identity.security.AuthenticatedUser;
 
 @Controller
 public class SchoolController {
+    private final TeacherClassService teacherClasses;
     private final SchoolService school;
     private final AssignmentService assignments;
     private final vn.edu.khtn8.assessment.QuizService quizzes;
-    public SchoolController(SchoolService school,AssignmentService assignments,vn.edu.khtn8.assessment.QuizService quizzes) { this.school = school; this.assignments=assignments;this.quizzes=quizzes; }
+    public SchoolController(SchoolService school,AssignmentService assignments,vn.edu.khtn8.assessment.QuizService quizzes,TeacherClassService teacherClasses) { this.school = school; this.assignments=assignments;this.quizzes=quizzes;this.teacherClasses=teacherClasses; }
     public record CodeRequest(@NotBlank @Pattern(regexp = "[a-f0-9]{32}") String code) { }
     public record MemberRequest(@Positive long userId) { }
     public record ClassRequest(@Positive long yearId, @NotBlank @Size(max = 80) String name) { }
@@ -29,11 +30,13 @@ public class SchoolController {
         return page(model, "school/classes", "Lớp học");
     }
     @GetMapping("/teacher/classes/{id}")
-    public String students(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, Model model) {
-        model.addAttribute("students", school.students(user, id));
+    public String students(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, Model model,
+            @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {
+        model.addAttribute("roster",teacherClasses.roster(user,id,search,page));
         model.addAttribute("classId",id);
         model.addAttribute("assignments",assignments.forClass(user,id));
-        model.addAttribute("quizzes",quizzes.list());
+        var quizIds=new java.util.HashSet<>(teacherClasses.assignableQuizIds(user,id));
+        model.addAttribute("quizzes",quizzes.list(user.id()).stream().filter(q->quizIds.contains(q.id())).toList());
         return page(model, "school/students", "Học sinh trong lớp");
     }
     @GetMapping("/school/students/{id}")

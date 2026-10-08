@@ -17,7 +17,7 @@ class QuizServiceTest {
     private QuizService service;
     @BeforeEach void setUp() { repository = mock(QuizRepository.class); service = new QuizService(repository); }
     @Test void enforcesMaxAttempts() {
-        when(repository.list()).thenReturn(List.of(new Quiz(5,"Quiz",15,3,1)));
+        when(repository.list(2)).thenReturn(List.of(new Quiz(5,"Quiz",15,3,1)));
         when(repository.active(2,5)).thenReturn(Optional.empty());
         when(repository.attempts(2,5)).thenReturn(3);
         var error = assertThrows(ResponseStatusException.class, () -> service.start(2,5));

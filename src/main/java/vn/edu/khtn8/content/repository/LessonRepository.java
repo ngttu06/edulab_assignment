@@ -28,7 +28,7 @@ public class LessonRepository {
                 LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.student_id = ?
                 WHERE l.status = 'PUBLISHED'
                   AND EXISTS (SELECT 1 FROM lesson_versions v WHERE v.lesson_id = l.id AND v.status = 'PUBLISHED')
-                """ + CatalogFilter.SQL + " AND CONCAT(l.title,' ',COALESCE(l.summary,''),' ',t.name) LIKE ? ESCAPE '!' " + """
+                """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId) + CatalogFilter.SQL + " AND CONCAT(l.title,' ',COALESCE(l.summary,''),' ',t.name) LIKE ? ESCAPE '!' " + """
                 ORDER BY s.grade_level,c.id,t.display_order, l.id
                 """, (rs, n) -> new LessonSummary(rs.getLong("id"), rs.getString("topic_name"), rs.getString("title"),
                 rs.getString("slug"), rs.getString("summary"), rs.getInt("duration_minutes"),
@@ -45,6 +45,7 @@ public class LessonRepository {
                 JOIN lesson_versions v ON v.lesson_id = l.id AND v.status = 'PUBLISHED'
                 LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.student_id = ?
                 WHERE l.id = ? AND l.status = 'PUBLISHED'
+                """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId) + """
                 ORDER BY v.version_number DESC LIMIT 1
                 """, (rs, n) -> new LessonDetail(rs.getLong("id"), rs.getString("topic_name"), rs.getString("title"),
                 rs.getString("summary"), rs.getInt("duration_minutes"), rs.getString("objectives"),
@@ -77,6 +78,6 @@ public class LessonRepository {
                 LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.student_id = ?
                 WHERE l.status = 'PUBLISHED'
                   AND EXISTS (SELECT 1 FROM lesson_versions v WHERE v.lesson_id = l.id AND v.status = 'PUBLISHED')
-                """, studentId);
+                """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId), studentId);
     }
 }

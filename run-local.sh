@@ -29,6 +29,6 @@ if [[ "${1:-}" != --existing-mysql ]]; then
         printf '%s\n' 'Missing Docker. Use --existing-mysql if the local database is already configured.' >&2
         exit 1
     fi
-    docker compose up -d --wait mysql
+    docker compose -f "$PWD/compose.local.yml" up -d --wait mysql
 fi
 exec mvn spring-boot:run -Dspring-boot.run.profiles=local

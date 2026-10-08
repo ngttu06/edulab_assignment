@@ -45,7 +45,7 @@ public class SupportAiService {
                            COALESCE(SUM(l.duration_minutes),0) minutes
                     FROM courses c JOIN subjects s ON s.id=c.subject_id
                     LEFT JOIN topics t ON t.course_id=c.id
-                    LEFT JOIN lessons l ON l.topic_id=t.id AND l.status='PUBLISHED'
+                    LEFT JOIN lessons l ON l.topic_id=t.id AND l.status='PUBLISHED' AND l.class_only=FALSE
                          AND EXISTS(SELECT 1 FROM lesson_versions v WHERE v.lesson_id=l.id AND v.status='PUBLISHED')
                     GROUP BY c.id,s.id ORDER BY s.grade_level,c.id LIMIT 24
                     """,(rs,row)->new Course(rs.getLong("id"),rs.getString("title"),rs.getString("name"),rs.getInt("grade_level"),

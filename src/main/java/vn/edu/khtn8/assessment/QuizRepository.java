@@ -22,14 +22,22 @@ public class QuizRepository {
     public QuizRepository(JdbcTemplate jdbc, ObjectMapper json) { this.jdbc = jdbc; this.json = json; }
 
     public List<Quiz> list() {
+        return list(0);
+    }
+    public List<Quiz> list(long userId) {
         return jdbc.query("""
                 SELECT q.id, q.title, q.duration_minutes, q.max_attempts,q.mode,q.reveal_after,
                   (SELECT COUNT(*) FROM quiz_items i JOIN questions x ON x.id=i.question_id WHERE i.quiz_id=q.id AND x.active=TRUE) question_count
                 FROM quizzes q WHERE q.published=TRUE
-                  AND (q.lesson_id IS NULL OR EXISTS (SELECT 1 FROM lessons l WHERE l.id=q.lesson_id AND l.status='PUBLISHED'))
+                """ + " AND (q.lesson_id IS NULL OR EXISTS (SELECT 1 FROM lessons l WHERE l.id=q.lesson_id AND l.status='PUBLISHED' AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",userId) + ")) " + """
+                """ + " AND " + vn.edu.khtn8.school.ContentAccess.quiz("q",userId) + """
                 ORDER BY q.id
                 """, (rs, n) -> new Quiz(rs.getLong("id"), rs.getString("title"), rs.getInt("duration_minutes"),
                 rs.getInt("max_attempts"), rs.getInt("question_count"),rs.getString("mode"),rs.getTimestamp("reveal_after")==null?null:rs.getTimestamp("reveal_after").toInstant()));
+    }
+
+    public void lockQuiz(long id) {
+        jdbc.queryForList("SELECT id FROM quizzes WHERE id=? FOR UPDATE",Long.class,id);
     }
 
     public void lockStudent(long studentId) {

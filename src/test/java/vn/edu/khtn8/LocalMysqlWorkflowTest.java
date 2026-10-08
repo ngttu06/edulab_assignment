@@ -53,7 +53,7 @@ class LocalMysqlWorkflowTest {
     AuthenticatedUser user(String name,String role){return new AuthenticatedUser(id(name),name,name,"unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_"+role)));}
 
     @Test void migrationAndAdminContentWorkflow() {
-        assertEquals(16,jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE",Integer.class));
+        assertEquals(17,jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE",Integer.class));
         var actor=user("admin","ADMIN");
         long topic=jdbc.queryForObject("SELECT MIN(id) FROM topics",Long.class);
         long lesson=admin.createLesson(actor,new AdminController.LessonInput(topic,"Bài kiểm thử","Tóm tắt",10,"Mục tiêu","<h2>Bài học</h2><script>alert(1)</script><p>Kiến thức</p>",null,0));

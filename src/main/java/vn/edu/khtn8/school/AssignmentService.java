@@ -37,6 +37,7 @@ public class AssignmentService {
                     a.due_at<CURRENT_TIMESTAMP(6) overdue
                 FROM class_assignments a JOIN quizzes q ON q.id=a.quiz_id JOIN classrooms c ON c.id=a.classroom_id
                 JOIN class_enrollments e ON e.classroom_id=c.id AND e.student_id=? AND e.active=TRUE
+                """ + (SchoolService.hasRole(user,"TEACHER") && !SchoolService.hasRole(user,"ADMIN") ? " WHERE EXISTS(SELECT 1 FROM class_teachers t WHERE t.classroom_id=c.id AND t.teacher_id="+user.id()+") " : "") + """
                 ORDER BY a.due_at DESC LIMIT 100
                 """,new BooleanColumnMapRowMapper("completed","overdue"),studentId,studentId);
     }
@@ -44,7 +45,7 @@ public class AssignmentService {
     public void create(AuthenticatedUser user,long classId,long quizId,Instant dueAt) {
         school.students(user,classId);
         if(!dueAt.isAfter(Instant.now())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Hạn hoàn thành phải ở tương lai.");
-        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM quizzes WHERE id=? AND published=TRUE)",Boolean.class,quizId)))
+        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM quizzes q WHERE q.id=? AND q.published=TRUE AND (q.class_only=FALSE OR EXISTS(SELECT 1 FROM quiz_classes qc WHERE qc.quiz_id=q.id AND qc.classroom_id=?)))",Boolean.class,quizId,classId)))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Chỉ giao quiz đã xuất bản.");
         jdbc.update("INSERT INTO class_assignments(classroom_id,quiz_id,created_by,due_at) VALUES(?,?,?,?)",classId,quizId,user.id(),Timestamp.from(dueAt));
     }

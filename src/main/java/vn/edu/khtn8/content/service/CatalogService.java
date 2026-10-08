@@ -25,7 +25,7 @@ public class CatalogService {
                 SELECT (SELECT COUNT(*) FROM courses) courses,
                     (SELECT COUNT(*) FROM subjects WHERE EXISTS(SELECT 1 FROM courses c WHERE c.subject_id=subjects.id)) subjects,
                     (SELECT COUNT(*) FROM lessons l JOIN topics t ON t.id=l.topic_id JOIN courses c ON c.id=t.course_id
-                        WHERE l.status='PUBLISHED' AND EXISTS(SELECT 1 FROM lesson_versions v WHERE v.lesson_id=l.id AND v.status='PUBLISHED')) lessons,
+                        WHERE l.status='PUBLISHED' AND l.class_only=FALSE AND EXISTS(SELECT 1 FROM lesson_versions v WHERE v.lesson_id=l.id AND v.status='PUBLISHED')) lessons,
                     (SELECT COUNT(DISTINCT c.teacher_id) FROM courses c JOIN users u ON u.id=c.teacher_id WHERE u.enabled=TRUE) teachers
                 """);
     }
@@ -50,6 +50,7 @@ public class CatalogService {
                 LEFT JOIN topics t ON t.course_id=c.id
                 LEFT JOIN lessons l ON l.topic_id=t.id AND l.status='PUBLISHED'
                     AND EXISTS(SELECT 1 FROM lesson_versions v WHERE v.lesson_id=l.id AND v.status='PUBLISHED')
+                """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId) + """
                 LEFT JOIN lesson_progress p ON p.lesson_id=l.id AND p.student_id=?
                 WHERE 1=1
                 """ + CatalogFilter.SQL + " AND CONCAT(c.title,' ',c.summary,' ',s.name) LIKE ? ESCAPE '!' " + """

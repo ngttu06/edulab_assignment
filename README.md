@@ -13,14 +13,24 @@ Giữ cấu hình/khóa mã hóa hiện có trong `.env.remote` riêng tư, xem
 
 ```bash
 cd /Users/ngttu/Workspace/project_asm_prj
-docker compose -f compose.cloud.yml up -d --build --wait
+docker compose up -d --no-build --wait
 ```
 
 Mặc định bước chuẩn bị DB chỉ validate. Nếu cloud thiếu V15/V16, lệnh dừng trước
 khi chạy app; sau khi backup và review, đặt `EDULAB_MIGRATE_ON_DEPLOY=true` trong
 `.env.remote` để duyệt job migration riêng. Không sửa schema tự động trong app.
-Cổng mặc định `127.0.0.1:8080`, context `/edulab`; đăng nhập cần HTTPS vì cookie Secure.
+Compose mặc định chỉ dùng `mysql.ngttu.com:3306/edulab_assignment`, container web
+tên **`edulab`**, nạp mật khẩu/JWT/khóa mã hóa hiện có từ `.env.remote`; không có
+container database hoặc fallback sang DB local. Image đã có sẵn trong workspace;
+đổi `--no-build` thành `--build` nếu source thay đổi hoặc máy chưa có image.
+Cổng mặc định `127.0.0.1:8088`, context `/edulab`; đăng nhập cần HTTPS vì cookie Secure.
 PlayerJS/HLS vẫn cần build hợp lệ của chủ website, không có player giả trong image.
+
+**Trạng thái triển khai 07/10/2026:** cloud đã được backup/phục hồi thử và nâng
+V15–V16 theo phê duyệt của chủ sở hữu; dữ liệu bảng cũ được giữ nguyên. Container
+`edulab` đang healthy, job `migrate` exit 0, approval thường trực `false`.
+Lỗi Docker Desktop Start do thiếu schema đã được khắc phục; lần sau có thể Start
+lại stack. Đổi biến môi trường thì dùng `docker compose up` thay vì chỉ Start.
 
 ## Chức năng hiện có
 
@@ -108,7 +118,7 @@ JWT secret phải là Base64 của ít nhất 32 byte ngẫu nhiên; không có 
 
 ### Script phát triển mặc định (không phải môi trường xác nhận 3307)
 
-`$PROJECT_ROOT/run-local.sh` dùng database `localhost:3306/edulab_assignment` và cấu hình trong `$PROJECT_ROOT/docker-compose.yml`. Script từ chối biến `EDULAB_DB_URL/USERNAME/PASSWORD` đã được export để tránh vô tình dùng DB khác; mặc định khởi động MySQL bằng Docker Compose. `--existing-mysql` bỏ qua Docker nhưng yêu cầu database/user local đã có sẵn.
+`$PROJECT_ROOT/run-local.sh` dùng database `localhost:3306/edulab_assignment` và cấu hình trong `$PROJECT_ROOT/compose.local.yml` (chỉ dành cho phát triển, không phải deployment cloud). Script từ chối biến `EDULAB_DB_URL/USERNAME/PASSWORD` đã được export để tránh vô tình dùng DB khác; khởi động MySQL bằng file Compose local chỉ định rõ. `--existing-mysql` bỏ qua Docker nhưng yêu cầu database/user local đã có sẵn. `docker compose up` thông thường dùng cloud, không khởi động DB local.
 
 ```bash
 # Chỉ chạy ở terminal local riêng, không dùng để xác nhận vào DB 3307 ở trên.

@@ -31,7 +31,7 @@ public class LearningPathService {
                 JOIN courses c ON c.id=t.course_id JOIN subjects s ON s.id=c.subject_id
                 LEFT JOIN lesson_progress p ON p.lesson_id=l.id AND p.student_id=?
                 WHERE l.status='PUBLISHED' AND EXISTS(SELECT 1 FROM lesson_versions v WHERE v.lesson_id=l.id AND v.status='PUBLISHED')
-                """ + vn.edu.khtn8.content.dto.CatalogFilter.SQL + " AND l.title LIKE ? ESCAPE '!' " + """
+                """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId) + vn.edu.khtn8.content.dto.CatalogFilter.SQL + " AND l.title LIKE ? ESCAPE '!' " + """
                 ORDER BY s.grade_level,c.id,t.display_order,l.id
                 """,new BooleanColumnMapRowMapper("unlocked"),args.toArray());
     }

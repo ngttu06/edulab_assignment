@@ -38,6 +38,7 @@ public class SecurityConfig {
         var videoPolicy=new vn.edu.khtn8.content.video.VideoPolicy(videoHosts,"/js/vendor/playerjs.js");
         String mediaSources=videoPolicy.hosts().stream().map(h->"https://"+h).collect(java.util.stream.Collectors.joining(" "));
         String baseCsp="default-src 'self'; connect-src 'self' "+storageEndpoints.cspSources()+"; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+        String communityCsp=baseCsp.replace("img-src 'self' data:;","img-src 'self' data: blob:;");
         String videoCsp="default-src 'self'; connect-src 'self' "+storageEndpoints.cspSources()+" "+mediaSources+" https://www.youtube.com; script-src 'self' https://cdn.jsdelivr.net https://www.youtube.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://i.ytimg.com; media-src 'self' blob: "+mediaSources+"; worker-src 'self' blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
         CookieCsrfTokenRepository csrf = new CookieCsrfTokenRepository();
         csrf.setCookieCustomizer(cookie -> cookie.httpOnly(true).secure(properties.getCookie().isSecure()).sameSite("Strict"));
@@ -73,7 +74,7 @@ public class SecurityConfig {
                             String uri=original instanceof String value ? value : request.getRequestURI();
                             String route=uri.substring(request.getContextPath().length());
                             boolean videoPage=route.matches("/lessons/[0-9]+/video") || route.equals("/teacher/videos");
-                            response.setHeader("Content-Security-Policy",videoPage ? videoCsp : baseCsp);
+                            response.setHeader("Content-Security-Policy",videoPage ? videoCsp : route.equals("/community") || route.startsWith("/community/posts/") ? communityCsp : baseCsp);
                             response.setHeader("Referrer-Policy",videoPage ? "strict-origin-when-cross-origin" : "same-origin");
                             if (route.contains("/video") || route.equals("/teacher/videos")) response.setHeader("Cache-Control","private, no-store");
                         })

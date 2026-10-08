@@ -7,9 +7,9 @@ spring:
   application:
     name: edulab-khtn8
   datasource:
-    url: ${EDULAB_DB_URL:jdbc:mysql://localhost:3306/edulab_assignment?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh}
-    username: ${EDULAB_DB_USERNAME:edulab}
-    password: ${EDULAB_DB_PASSWORD:edulab_local_password}
+    url: ${EDULAB_DB_URL}
+    username: ${EDULAB_DB_USERNAME}
+    password: ${EDULAB_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       connection-init-sql: "SET time_zone = '+00:00'"

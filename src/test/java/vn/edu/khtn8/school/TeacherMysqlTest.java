@@ -39,6 +39,7 @@ class TeacherMysqlTest {
     @Autowired TeacherClassService classes;
     @Autowired SchoolService school;
     @Autowired AssignmentService assignments;
+    @Autowired TeacherInsightsService insights;
     @Autowired LessonService lessons;
     @Autowired LearningPathService path;
     @Autowired CatalogService catalog;
@@ -67,6 +68,7 @@ class TeacherMysqlTest {
     }
     @Test @WithMockUser(roles="STUDENT") void lessonLifecycleAndClassVisibility() {
         long classId=classroom();var teacher=teacher();var student=student();var outsider=outsider("STUDENT");
+        long completedBefore=(long)classes.report(teacher,classId,student.id()).get("completed");
         long id=authoring.saveLesson(teacher,null,lessonInput(classId,"DRAFT"));
         assertThrows(ResponseStatusException.class,()->lessons.detail(student.id(),id));
         authoring.saveLesson(teacher,id,lessonInput(classId,"PUBLISHED"));
@@ -75,12 +77,12 @@ class TeacherMysqlTest {
         assertFalse(path.steps(0).stream().anyMatch(r->((Number)r.get("id")).longValue()==id));
         assertDoesNotThrow(()->path.requireUnlocked(student.id(),id));
         lessons.updateProgress(student.id(),id,new ProgressRequest("COMPLETED",100));
-        assertEquals(1L,classes.report(teacher,classId,student.id()).get("completed"));
+        assertEquals(completedBefore+1,classes.report(teacher,classId,student.id()).get("completed"));
         var roster=rows(classes.roster(teacher,classId,"hocsinh",0),"students");
         assertFalse(roster.isEmpty());assertEquals(100,((Number)roster.getFirst().get("completion_percent")).intValue());
         classes.membership(teacher,classId,student.id(),false);
         assertThrows(ResponseStatusException.class,()->lessons.detail(student.id(),id));
-        assertThrows(ResponseStatusException.class,()->classes.report(teacher,classId,student.id()));
+        assertEquals(completedBefore+1,classes.report(teacher,classId,student.id()).get("completed"));
         classes.enroll(teacher,classId,"hocsinh");assertEquals(100,lessons.detail(student.id(),id).completionPercent());
         authoring.saveLesson(teacher,id,lessonInput(classId,"ARCHIVED"));
         assertThrows(ResponseStatusException.class,()->lessons.detail(student.id(),id));
@@ -138,6 +140,101 @@ class TeacherMysqlTest {
         school.enroll(admin,other,student.id());long id=authoring.saveLesson(admin,null,lessonInput(other,"PUBLISHED"));
         var report=school.report(teacher,student.id());
         assertFalse(((List<vn.edu.khtn8.content.dto.LessonSummary>)report.get("lessons")).stream().anyMatch(l->l.id()==id));
+    }
+    @Test @WithMockUser(roles="STUDENT") void softDeletePreservesProgressAttemptsAndCancelsAssignments() {
+        var t=teacher();var s=student();long c=classroom();
+        long completedBefore=(long)classes.report(t,c,s.id()).get("completed");
+        long lesson=authoring.saveLesson(t,null,lessonInput(c,"PUBLISHED"));
+        lessons.updateProgress(s.id(),lesson,new ProgressRequest("COMPLETED",100));
+        authoring.deleteLesson(t,lesson);
+        assertNotNull(authoring.lesson(t,lesson).get("deleted_at"));
+        assertThrows(ResponseStatusException.class,()->lessons.detail(s.id(),lesson));
+        assertEquals(completedBefore+1,classes.report(t,c,s.id()).get("completed"));
+        assertThrows(ResponseStatusException.class,()->authoring.saveLesson(t,lesson,lessonInput(c,"PUBLISHED")));
+        long quiz=authoring.saveQuiz(t,null,quizInput(c,true));
+        assignments.create(t,c,quiz,Instant.now().plusSeconds(3600));
+        var attempt=quizzes.start(s.id(),quiz);var q=attempt.questions().getFirst();
+        authoring.deleteQuiz(t,quiz);
+        assertThrows(ResponseStatusException.class,()->quizzes.start(s.id(),quiz));
+        assertEquals(new BigDecimal("10.00"),quizzes.submit(s.id(),attempt.id(),Map.of(q.id(),q.options().get(1).id())).score());
+        assertTrue(assignments.forStudent(s,s.id()).stream().noneMatch(a->((Number)a.get("quiz_id")).longValue()==quiz));
+        assertNotNull(assignments.forClass(t,c).getFirst().get("cancelled_at"));
+        assertEquals(1L,((Number)rows(classes.report(t,c,s.id()),"quizzes").getFirst().get("graded_count")).longValue());
+    }
+    @Test void assignmentCrudChecksClassAndKeepsOriginalQuiz() {
+        var t=teacher();long c=classroom();long quiz=authoring.saveQuiz(t,null,quizInput(c,true));
+        assignments.create(t,c,quiz,Instant.now().plusSeconds(3600));
+        long id=((Number)assignments.forClass(t,c).getFirst().get("id")).longValue();
+        Instant due=Instant.now().plusSeconds(7200).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        assignments.updateAssignment(t,c,id,due);
+        assertEquals(quiz,((Number)assignments.assignment(t,c,id).get("quiz_id")).longValue());
+        assertEquals(due,((java.sql.Timestamp)assignments.assignment(t,c,id).get("due_at")).toInstant());
+        assertThrows(AccessDeniedException.class,()->assignments.cancelAssignment(outsider("TEACHER"),c,id));
+        assertThrows(ResponseStatusException.class,()->assignments.assignment(user("admin","ADMIN"),otherClass(),id));
+        assertThrows(ResponseStatusException.class,()->assignments.updateAssignment(t,c,id,Instant.now().minusSeconds(60)));
+        assignments.cancelAssignment(t,c,id);assertNotNull(assignments.assignment(t,c,id).get("cancelled_at"));
+        assertThrows(ResponseStatusException.class,()->assignments.updateAssignment(t,c,id,due));
+    }
+    @Test void feedbackCrudPreservesRevisionAndRestrictsAuthors() {
+        var t=teacher();var s=student();var other=outsider("TEACHER");long c=classroom();
+        school.assign(user("admin","ADMIN"),c,other.id());assignments.feedback(t,s.id(),"Ban đầu");
+        long id=((Number)assignments.feedback(t,s.id()).getFirst().get("id")).longValue();
+        assertThrows(AccessDeniedException.class,()->assignments.updateFeedback(other,s.id(),id,"Không được"));
+        assertThrows(AccessDeniedException.class,()->assignments.deleteFeedback(other,s.id(),id));
+        assignments.updateFeedback(t,s.id(),id,"Đã sửa");
+        assertEquals("Đã sửa",assignments.feedbackDetail(t,s.id(),id).get("body"));
+        assertEquals("Ban đầu",jdbc.queryForObject("SELECT body FROM teacher_feedback_revisions WHERE feedback_id=?",String.class,id));
+        assignments.deleteFeedback(t,s.id(),id);
+        assertTrue(assignments.feedback(s,s.id()).stream().noneMatch(f->((Number)f.get("id")).longValue()==id));
+        assertNotNull(jdbc.queryForObject("SELECT deleted_at FROM teacher_feedback WHERE id=?",java.sql.Timestamp.class,id));
+    }
+    @Test @WithMockUser(roles="STUDENT") void archivedClassIsReadOnlyAndRetainsMembershipHistory() {
+        var t=teacher();var admin=user("admin","ADMIN");var s=student();long c=classroom();
+        long quiz=authoring.saveQuiz(t,null,quizInput(c,true));
+        long year=((Number)school.classroom(t,c).get("academic_year_id")).longValue();
+        assertThrows(AccessDeniedException.class,()->school.updateClass(t,c,year,"Không được"));
+        assertThrows(AccessDeniedException.class,()->school.archiveClass(t,c));
+        school.updateClass(admin,c,year,"Lớp đổi tên");assertEquals("Lớp đổi tên",school.classroom(t,c).get("name"));
+        school.archiveClass(admin,c);
+        assertTrue(school.classrooms(t).stream().noneMatch(x->((Number)x.get("id")).longValue()==c));
+        assertDoesNotThrow(()->classes.report(t,c,s.id()));
+        assertThrows(ResponseStatusException.class,()->classes.enroll(t,c,"hocsinh"));
+        assertThrows(ResponseStatusException.class,()->classes.membership(t,c,s.id(),false));
+        assertThrows(ResponseStatusException.class,()->assignments.create(t,c,quiz,Instant.now().plusSeconds(3600)));
+        assertThrows(ResponseStatusException.class,()->quizzes.start(s.id(),quiz));
+        assertEquals(true,classes.member(t,c,s.id()).get("active"));
+    }
+    @Test void deletionRequiresAuthorAndCurrentClassAssignment() {
+        var t=teacher();long c=classroom();long quiz=authoring.saveQuiz(t,null,quizInput(c,true));
+        long lesson=authoring.saveLesson(t,null,lessonInput(c,"DRAFT"));var other=outsider("TEACHER");
+        assertThrows(AccessDeniedException.class,()->authoring.deleteQuiz(other,quiz));
+        assertThrows(AccessDeniedException.class,()->authoring.deleteLesson(other,lesson));
+        school.unassign(user("admin","ADMIN"),c,t.id());
+        assertThrows(AccessDeniedException.class,()->authoring.deleteQuiz(t,quiz));
+        assertThrows(AccessDeniedException.class,()->authoring.deleteLesson(t,lesson));
+    }
+    @Test void teacherOverviewResultsAndDuplicationRespectAssignment() {
+        var teacher=teacher();long classId=classroom();
+        long lesson=authoring.saveLesson(teacher,null,lessonInput(classId,"PUBLISHED"));
+        long quiz=authoring.saveQuiz(teacher,null,quizInput(classId,true));
+        long lessonCopy=authoring.duplicateLesson(teacher,lesson),quizCopy=authoring.duplicateQuiz(teacher,quiz);
+        assertEquals("DRAFT",authoring.lesson(teacher,lessonCopy).get("status"));
+        assertEquals(false,authoring.quiz(teacher,quizCopy).get("published"));
+        assertEquals(1,((List<?>)authoring.quiz(teacher,quizCopy).get("questions")).size());
+        assertEquals(true,authoring.quiz(teacher,quiz).get("published"));
+        assignments.create(teacher,classId,quiz,Instant.now().plusSeconds(3600));
+        long assignment=((Number)assignments.forClass(teacher,classId).getFirst().get("id")).longValue();
+        assertEquals(1,insights.submissionStatus(teacher,classId,assignment).size());
+        assertEquals(false,insights.submissionStatus(teacher,classId,assignment).getFirst().get("completed"));
+        assertTrue(insights.results(teacher,classId).stream().anyMatch(r->r.get("best_score")==null && ((Number)r.get("quiz_id")).longValue()==quiz));
+        assertFalse(insights.assignments(teacher).isEmpty());
+        assertFalse(((List<?>)insights.overview(teacher).get("upcoming")).isEmpty());
+        assertEquals(1L,insights.classroom(teacher,classId).get("studentCount"));
+        var outsider=outsider("TEACHER");
+        assertTrue(insights.assignments(outsider).isEmpty());
+        assertThrows(AccessDeniedException.class,()->insights.results(outsider,classId));
+        assertThrows(AccessDeniedException.class,()->insights.submissionStatus(outsider,classId,assignment));
+        assertThrows(AccessDeniedException.class,()->authoring.duplicateQuiz(outsider,quiz));
     }
     @SuppressWarnings("unchecked") private List<Map<String,Object>> rows(Map<String,Object> report,String key) {return (List<Map<String,Object>>)report.get(key);}
 }

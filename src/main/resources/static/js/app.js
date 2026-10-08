@@ -34,7 +34,7 @@
         const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
         document.querySelectorAll('[data-nav]').forEach(link => {
             const path = new URL(link.href).pathname.replace(/\/$/, '') || '/';
-            if (currentPath === path || (path !== (context || '/') && currentPath.startsWith(path + '/'))) {
+            if (currentPath === path || (!link.hasAttribute('data-nav-exact') && path !== (context || '/') && currentPath.startsWith(path + '/'))) {
                 link.classList.add('is-active');
                 link.setAttribute('aria-current', 'page');
             }

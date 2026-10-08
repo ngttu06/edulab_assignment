@@ -2,8 +2,8 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <div class="community-page">
-    <nav class="discovery-tabs" aria-label="Khám phá EduLab"><a href="${pageContext.request.contextPath}/"><ui:icon name="home"/>Trang chủ</a><a class="is-active" href="${pageContext.request.contextPath}/forum" aria-current="page"><ui:icon name="users"/>Cộng đồng</a></nav>
-    <header class="community-heading"><div><span class="eyebrow">CÙNG NHAU HIỂU BÀI</span><h1>Cộng đồng EduLab</h1><p>Chia sẻ một câu hỏi. Khám phá một góc nhìn mới.</p></div><a class="btn btn-outline-primary" href="#composer">Đặt câu hỏi</a></header>
+    <nav class="discovery-tabs" aria-label="Khám phá EduLab"><a href="${pageContext.request.contextPath}/"><ui:icon name="home"/>Trang chủ</a><a href="${pageContext.request.contextPath}/community"><ui:icon name="users"/>Cộng đồng</a><a class="is-active" href="${pageContext.request.contextPath}/forum" aria-current="page"><ui:icon name="chat"/>Hỏi đáp học tập</a></nav>
+    <header class="community-heading"><div><span class="eyebrow">CÙNG NHAU HIỂU BÀI</span><h1>Hỏi đáp học tập</h1><p>Chia sẻ một câu hỏi. Khám phá một góc nhìn mới.</p></div><a class="btn btn-outline-primary" href="#composer">Đặt câu hỏi</a></header>
     <section id="composer" class="panel feed-composer" aria-labelledby="composerTitle">
         <div class="composer-heading"><span class="feed-avatar" aria-hidden="true"><ui:icon name="user"/></span><div><h2 id="composerTitle">Bạn đang muốn tìm hiểu điều gì?</h2><p>Trao đổi cùng cộng đồng và giáo viên.</p></div></div>
         <p id="forumNotice" role="alert"></p>

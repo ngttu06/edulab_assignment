@@ -53,4 +53,36 @@ class TeacherSecurityTest {
         mvc.perform(multipart("/api/v1/teacher/quizzes/import").file(new MockMultipartFile("file","quiz.xlsx","text/plain",new byte[2])).with(user(actor("TEACHER"))).with(csrf())).andExpect(status().isBadRequest());
         mvc.perform(multipart("/api/v1/teacher/quizzes/import").file(new MockMultipartFile("file","quiz.csv","text/csv",new byte[1024*1024+1])).with(user(actor("TEACHER"))).with(csrf())).andExpect(status().isPayloadTooLarge());
     }
+    @Test void deletionRequiresRoleAndCsrf() throws Exception {
+        for(String kind:List.of("lessons","quizzes")) {
+            mvc.perform(delete("/api/v1/teacher/"+kind+"/1").with(user(actor("TEACHER")))).andExpect(status().isForbidden());
+            mvc.perform(delete("/api/v1/teacher/"+kind+"/1").with(user(actor("STUDENT"))).with(csrf())).andExpect(status().isForbidden());
+            mvc.perform(delete("/api/v1/teacher/"+kind+"/1").with(user(actor("TEACHER"))).with(csrf())).andExpect(status().isOk());
+        }
+        verify(authoring).deleteLesson(any(),eq(1L));verify(authoring).deleteQuiz(any(),eq(1L));
+    }
+    @Test void duplicationRequiresTeacherAndCsrf() throws Exception {
+        for(String kind:List.of("lessons","quizzes")) {
+            String path="/api/v1/teacher/"+kind+"/1/duplicate";
+            mvc.perform(post(path).with(user(actor("TEACHER")))).andExpect(status().isForbidden());
+            mvc.perform(post(path).with(user(actor("STUDENT"))).with(csrf())).andExpect(status().isForbidden());
+            mvc.perform(post(path).with(user(actor("TEACHER"))).with(csrf())).andExpect(status().isOk());
+        }
+        verify(authoring).duplicateLesson(any(),eq(1L));verify(authoring).duplicateQuiz(any(),eq(1L));
+    }
+    @Test void lessonPreviewSanitizesHtmlAndRequiresCsrf() throws Exception {
+        String body="{\"html\":\"<h2>Hello</h2><script>alert(1)</script>\"}";
+        mvc.perform(post("/api/v1/teacher/lessons/preview").with(user(actor("TEACHER"))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/teacher/lessons/preview").with(user(actor("STUDENT"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/teacher/lessons/preview").with(user(actor("TEACHER"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.html").value(org.hamcrest.Matchers.containsString("<h2>Hello</h2>")))
+                .andExpect(jsonPath("$.html").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<script>"))));
+    }
+    @Test void listAndEditorHaveSeparateViews() throws Exception {
+        for(String kind:List.of("lessons","quizzes")) {
+            mvc.perform(get("/teacher/"+kind).with(user(actor("TEACHER")))).andExpect(status().isOk()).andExpect(model().attribute("contentPage","/WEB-INF/jsp/teacher/content-list.jsp"));
+            mvc.perform(get("/teacher/"+kind+"/new").with(user(actor("TEACHER")))).andExpect(status().isOk()).andExpect(model().attribute("contentPage","/WEB-INF/jsp/teacher/"+(kind.equals("lessons")?"lesson":"quiz")+"-form.jsp"));
+        }
+        mvc.perform(get("/teacher/quizzes/import").with(user(actor("TEACHER")))).andExpect(status().isOk()).andExpect(model().attribute("importMode",true));
+    }
 }

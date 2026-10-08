@@ -11,8 +11,9 @@
   `.env.remote` cấp mật khẩu/JWT/khóa mã hóa, không chọn lại DB local.
 - `.dockerignore`: chỉ gửi `pom.xml`, `src/main`, entrypoint và Dockerfile tới builder.
   Không gửi `.env`, `.tools`, Git, backup DB, upload, test fixture hoặc secret.
-- `compose.local.yml` chỉ dành cho MySQL phát triển qua `run-local.sh`, không được
-  include trong deployment mặc định. Không chạy fixture đó để phục vụ người dùng.
+- Không còn `compose.local.yml` hoặc `run-local.sh`: deployment chỉ dùng MySQL
+  cloud; app không có datasource fallback về MySQL local. Bộ kiểm thử vẫn có thể
+  dùng MySQL dùng một lần ở loopback nếu được chỉ định rõ và không phải deployment.
 - Cần Docker Compose **2.20+** để hỗ trợ `include`; cả file mặc định và file cloud
   dùng cùng project `edulab`, không tạo hai bộ container khi đổi cách gọi lệnh.
 - Healthcheck `GET /edulab/actuator/health` trả `{"status":"UP"}` khi DB truy vấn được,
@@ -46,9 +47,9 @@ Docker không đóng gói/migrate dữ liệu cloud, không thay cấu hình R2/
 
 ## 2. Schema và migration
 
-Cloud `mysql.ngttu.com/edulab_assignment` đã được nâng **V16** ngày 07/10/2026 theo
-phê duyệt riêng, sau backup/phục hồi thử; xem kết quả cuối tài liệu. Source hiện có
-V1–V16. Với bản nâng cấp sau, sao lưu cloud, kiểm tra
+Cloud `mysql.ngttu.com/edulab_assignment` đã được nâng **V19** ngày 08/10/2026 theo
+phê duyệt riêng, sau backup/phục hồi thử (xem lịch sử bên dưới). Source hiện có
+V1–V20. Bản V20 cần sao lưu cloud, kiểm tra
 history/checksum và diễn tập staging trước khi nâng cấp. Không sửa file migration
 đã áp dụng. MySQL DDL không bảo đảm rollback nguyên transaction; backup là bắt buộc.
 
@@ -228,3 +229,148 @@ Maven nhưng vẫn cần mạng tới MySQL, YouTube/HLS, AI/R2 đang bật.
 - Docker Desktop Start **không nạp lại env** nếu bạn vừa sửa `.env.remote`;
   dùng `docker compose up -d --no-build --wait` để reconcile/recreate khi cần.
   Không bật approval lâu dài hoặc bỏ job kiểm tra để che lỗi schema/network.
+
+### Triển khai teacher workspace V17 — 08/10/2026
+
+- Được chủ sở hữu phê duyệt sao lưu/nâng V17 trên cloud hiện tại. Tạm dừng app
+  trong thời gian backup/nâng cấp để tránh scheduled jobs ghi dữ liệu.
+- Backup riêng tư và report tại
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-db-backups/v17-20261008T020217Z/`.
+  SHA-256 hợp lệ; phục hồi trên MySQL cô lập khớp schema/số dòng/hash của 44 bảng.
+  Diễn tập SQL V17 giữ nguyên dữ liệu cũ. Không gồm event definitions do tài khoản
+  không có quyền EVENT; đây không phải backup toàn bộ MySQL server.
+- Flyway chỉ áp dụng V17, history V1–V17 hợp lệ. Đối chiếu toàn bộ dữ liệu trên
+  các cột cũ trước khi chạy lại app đều khớp; kiểm tra khóa ngoại và CHECK TABLE đạt.
+  Schema có 46 bảng sau nâng cấp. Không repair/clean/baseline/import dữ liệu cloud.
+- Image `edulab-khtn8:teacher-v17` (đồng thời tag `latest`) đã chạy trong container
+  `edulab`, bind `127.0.0.1:8088`, healthcheck `UP`/Docker `healthy`. Job `migrate`
+  thường trực exit 0; approval và Spring startup migration vẫn `false`.
+  Giữ nguyên `.env.remote`, khóa mã hóa và volume storage. Image cũ được giữ bằng
+  tag `edulab-khtn8:before-v17`; rollback schema không được tự động thực hiện.
+- Archive image Linux/amd64 khoảng 212 MiB:
+  `/Users/ngttu/Workspace/project_asm_prj/target/edulab-khtn8-v17-docker.tar.gz`,
+  kèm `.sha256` đã kiểm tra. Archive không chứa database/volume/secrets runtime.
+- HTTP/JSP và JavaScript teacher trả 200; kiểm tra WAR đang chạy khớp migration V17,
+  authoring JS và roster JSP hiện tại. Browser public pages desktop/mobile đạt,
+  không lỗi JavaScript hoặc tràn ngang; 5 test Docker Compose đạt. Không chạy luồng
+  ghi dữ liệu teacher/student, upload hoặc AI trên cloud trong smoke test này.
+- Cookie Secure vẫn bật; truy cập đăng nhập thực tế cần HTTPS proxy tin cậy.
+  Cổng loopback HTTP dùng kiểm tra nội bộ, không phải public deployment endpoint.
+
+### Triển khai teacher workspace V18 — 08/10/2026
+
+- Theo yêu cầu cập nhật container của chủ sở hữu, đã dừng app trong thời gian
+  backup/nâng cấp, phục hồi thử trên MySQL cô lập và diễn tập V18 thành công.
+- Backup riêng tư, SHA-256, manifest và report:
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-db-backups/v18-20261008T060817Z/`.
+  Bản phục hồi khớp schema/số dòng/hash trước nâng cấp. Không gồm event definitions
+  do tài khoản không có quyền EVENT; không phải backup toàn bộ MySQL server.
+- Flyway chỉ áp dụng V18; history/checksum V1–V18 hợp lệ. Dữ liệu trên toàn bộ
+  cột gốc được đối chiếu và giữ nguyên trước khi chạy app; khóa ngoại/CHECK TABLE đạt.
+  Không repair/clean/baseline hoặc nhập đè database cloud.
+- Container `edulab` chạy `edulab-khtn8:teacher-v18`, image cũng được gắn tag
+  `latest` để lệnh Compose mặc định không quay về V17. Image ID:
+  `sha256:9c225a5bf98c1a6cdcc49cc836fd638b56c82e23c08654f603cc8bd8db9b37c0`.
+  Bind `127.0.0.1:8088`, health `UP`/`healthy`, job migrate exit 0.
+- Giữ nguyên `.env.remote`, các khóa runtime và volume `edulab_app-storage`.
+  Approval migration và Spring startup migration vẫn `false`.
+  Image trước nâng cấp giữ tại `edulab-khtn8:before-v18` và `teacher-v17`;
+  không tự động hạ schema hoặc phục hồi đè cloud khi rollback ứng dụng.
+- HTTP public/JSP và JavaScript workspace trả 200; 5 test Docker Compose đạt.
+  Các luồng CRUD được kiểm thử trên database dùng một lần, không tạo fixture
+  teacher/student trên cloud trong đợt triển khai này.
+
+### Triển khai Cộng đồng tách biệt V19 — 08/10/2026
+
+- `docker-compose.yml` chỉ có `app` + job `migrate`, datasource cố định tại
+  `mysql.ngttu.com` qua `sslMode=VERIFY_IDENTITY`. Đã gỡ `run-local.sh`,
+  `compose.local.yml` và mọi giá trị mặc định MySQL local trong cấu hình app.
+  Không còn container/volume MySQL local chạy kèm deployment; bộ test loopback
+  dùng database tạm thời riêng và không nằm trong Compose cloud.
+- Đã dừng web để backup V18, dump/kiểm SHA-256, phục hồi thử trên container MySQL
+  **cô lập dùng một lần**, đối chiếu 47 bảng và diễn tập V19. Container thử đã
+  được xóa. Bản backup/report riêng tư nằm tại
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-db-backups/v19-20261008T131112Z/`.
+  Do tài khoản cloud không có quyền EVENT, dump không gồm event definitions;
+  không phải bản sao lưu toàn bộ MySQL server.
+- Job Flyway riêng đã áp dụng **chỉ V19**. History V1–V19 hợp lệ, 5 bảng cộng đồng
+  mới được thêm, toàn bộ dữ liệu trên các cột/bảng cũ giữ nguyên; kiểm tra khóa
+  ngoại và `CHECK TABLE` đạt. Không repair/clean/baseline/import database cloud.
+- Container `edulab` dùng image `edulab-khtn8:community-v19` (đồng thời tag
+  `latest`), image ID `sha256:e23e8076b8072123c86ec9d6e5bd2930a3a55da104ea8c271e43e392e2a215d3`.
+  Image trước nâng cấp giữ tại `edulab-khtn8:before-community-v19`; volume
+  `edulab_app-storage` và `.env.remote` được giữ nguyên. Bind `127.0.0.1:8088`,
+  `health=UP`/Docker `healthy`, migration job mặc định exit 0 và approval
+  `false`; startup migration vẫn tắt.
+- Các tài nguyên JS/CSS, trang public và trang riêng yêu cầu đăng nhập trả đúng
+  HTTP; không đăng bài/tải ảnh thử trên cloud. 5 bài kiểm thử Compose đạt.
+  **Lưu ý upload ảnh:** Storage cloud bật nhưng `EDULAB_CLAMAV_HOST` chưa cấu
+  hình, nên ảnh mới vẫn cách ly `PENDING_SCAN`, chưa đăng lên bảng tin được.
+  Cần triển khai ClamAV INSTREAM thật trên mạng tin cậy rồi cấu hình host/port
+  trước khi cho phép ảnh người dùng; không bật `EDULAB_DEV_SCAN_BYPASS`.
+
+### Cập nhật giao diện Cộng đồng — 08/10/2026
+
+- Bỏ banner, giữ bố cục Trang chủ và cột tiện ích; composer/bảng tin theo kiểu
+  mạng xã hội với menu ba chấm, avatar tròn và hàng Thích/Bình luận/Chia sẻ.
+- Image đang chạy: `edulab-khtn8:community-feed-v19` (cũng tag `latest`), ID
+  `sha256:f09931c8f1427bdc3b0ece552e68e5e7c0b5c52b877507716165f0d6f2c69087`.
+  Rollback: `edulab-khtn8:before-community-feed-v19`, ID
+  `sha256:97ee607420864d5c4609a278e82f170d009c2a936259c88be7c1b596cd81f5e2`.
+- So sánh nội dung WAR với bản đang chạy trước cập nhật: chỉ thay 4 file
+  `WEB-INF/jsp/community/list.jsp`, CSS/JS cộng đồng và `icons.svg`.
+  Không thay Java backend hoặc migration; giữ nguyên biến môi trường,
+  volume và bind `127.0.0.1:8088`.
+- Đã chạy 3 test `SocialCommunitySecurityTest` trong
+  `maven:3.9.9-eclipse-temurin-21`; test JSP thật `SocialCommunityViewTest`
+  và browser test API giả lập đạt (7 viewport 320–1440 px). Chi tiết tại
+  `/Users/ngttu/Workspace/project_asm_prj/docs/social-community.md`.
+- Chỉ recreate `app` với `--no-deps --no-build --wait`. Sau triển khai:
+  Docker `healthy`, health `UP`, HTTP CSS/JS/icon và JSP trong WAR khớp
+  byte-for-byte với nguồn. Không đăng bài/upload thử, không chạy migration;
+  `SPRING_FLYWAY_ENABLED`, `EDULAB_MIGRATE_ON_DEPLOY` và scan bypass đều `false`.
+
+Rollback chỉ giao diện/ứng dụng, không khôi phục database:
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:before-community-feed-v19 docker compose \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+```
+
+Giữ `EDULAB_IMAGE` tương ứng cho lần triển khai sau rollback; mặc định
+`latest` hiện trỏ bản giao diện mới.
+
+## Phát hành bình luận/cảm xúc V20
+
+- Phạm vi nguồn gồm workspace giáo viên, Cộng đồng độc lập, motion UI và 7 cảm xúc.
+  Nâng schema từ V19 chỉ thêm `community_likes.reaction_type` với default `LIKE`
+  và CHECK constraint; không sửa migration đã chạy hoặc xóa dữ liệu cũ.
+- Kiểm tra phát hành ngày 08/10/2026: `mvn -B -ntp package` với JDK 21 và MySQL
+  dùng một lần đạt **221 test, 0 lỗi, 0 bỏ qua**, tạo WAR thành công. Hai assertion
+  tổng migration trong bộ tích hợp đã cập nhật từ 19 lên 20. 5 test Compose,
+  browser motion và UI cộng đồng 7 viewport đều đạt.
+- Quy trình: build image gắn revision Git; giữ image `community-feed-v19` để
+  rollback; dừng app; backup DB với SHA-256; phục hồi trên MySQL cô lập và diễn tập
+  V20; áp dụng đúng một migration bằng job riêng có approval một lần; kiểm tra dữ
+  liệu trên các cột gốc và lượt thích; recreate app rồi kiểm tra health/assets.
+- Không ghi approval lâu dài vào `.env.remote`. `SPRING_FLYWAY_ENABLED`,
+  `EDULAB_MIGRATE_ON_DEPLOY` và `EDULAB_DEV_SCAN_BYPASS` phải giữ `false`.
+  Backup/report vận hành riêng tư lưu dưới
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-db-backups/`, không vào Git/image.
+  Dump không gồm event definitions do quyền tài khoản; không phải backup toàn server.
+- Không chạy app V20 trên schema V19. Rollback app có thể giữ cột additive V20;
+  app v19 chỉ hiển thị các loại cảm xúc như lượt thích, không tự hạ schema.
+
+Rollback riêng ứng dụng về image đã xác nhận, giữ nguyên database/volume:
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:community-feed-v19 docker compose \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+```
+
+Sau rollback, tiếp tục chỉ định image này cho các lệnh Compose; không tự dùng
+`latest` nếu tag đó đã trỏ V20. Xem report của lần phát hành để biết image ID,
+commit và trạng thái triển khai thực tế. ClamAV và dọn ảnh R2 mồ côi vẫn là
+công việc riêng, không bật scan bypass để thay thế.

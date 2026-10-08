@@ -47,7 +47,7 @@ public class TeacherClassService {
     }
     @Transactional
     public void enroll(AuthenticatedUser user,long classId,String username) {
-        school.authorizeClass(user,classId);
+        school.requireActiveClass(user,classId);
         var ids=jdbc.queryForList("SELECT id FROM users WHERE username=? AND role='STUDENT' AND enabled=TRUE",Long.class,username.trim());
         if(ids.isEmpty()) throw bad("Không tìm thấy tài khoản học sinh đang hoạt động với tên đăng nhập này.");
         jdbc.update("INSERT INTO class_enrollments(classroom_id,student_id) VALUES(?,?) ON DUPLICATE KEY UPDATE active=TRUE",classId,ids.getFirst());
@@ -55,7 +55,7 @@ public class TeacherClassService {
     }
     @Transactional
     public void membership(AuthenticatedUser user,long classId,long studentId,boolean active) {
-        school.authorizeClass(user,classId);
+        school.requireActiveClass(user,classId);
         if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM class_enrollments WHERE classroom_id=? AND student_id=?)",Boolean.class,classId,studentId))) throw bad("Học sinh không thuộc lớp này.");
         if(active && !Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND role='STUDENT' AND enabled=TRUE)",Boolean.class,studentId))) throw bad("Tài khoản học sinh không hoạt động.");
         jdbc.update("UPDATE class_enrollments SET active=? WHERE classroom_id=? AND student_id=?",active,classId,studentId);audit(user,classId,studentId,active);
@@ -65,12 +65,12 @@ public class TeacherClassService {
     }
     public Map<String,Object> report(AuthenticatedUser user,long classId,long studentId) {
         school.authorizeClass(user,classId);
-        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM class_enrollments WHERE classroom_id=? AND student_id=? AND active=TRUE)",Boolean.class,classId,studentId))) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Học sinh không đang theo học lớp này.");
+        member(user,classId,studentId);
         var lessons=jdbc.queryForList("""
                 SELECT l.id,l.title,COALESCE(p.completion_percent,0) completion_percent,COALESCE(p.status,'NOT_STARTED') status,p.completed_at
                 FROM class_lessons cl JOIN lessons l ON l.id=cl.lesson_id
                 LEFT JOIN lesson_progress p ON p.lesson_id=l.id AND p.student_id=?
-                WHERE cl.classroom_id=? AND l.status='PUBLISHED' ORDER BY l.id
+                WHERE cl.classroom_id=? AND (l.status='PUBLISHED' OR p.student_id IS NOT NULL) ORDER BY l.id
                 """,studentId,classId);
         var quizzes=jdbc.queryForList("""
                 SELECT q.id,q.title,COUNT(a.id) attempts,COUNT(CASE WHEN a.status='GRADED' THEN 1 END) graded_count,
@@ -93,4 +93,10 @@ public class TeacherClassService {
                 "completed",lessons.stream().filter(l->"COMPLETED".equals(l.get("status"))).count());
     }
     private ResponseStatusException bad(String message) {return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}
+    public Map<String,Object> member(AuthenticatedUser user,long classId,long studentId) {
+        school.authorizeClass(user,classId);
+        var rows=jdbc.query("SELECT u.id,u.username,u.full_name,e.active,c.archived_at FROM class_enrollments e JOIN users u ON u.id=e.student_id JOIN classrooms c ON c.id=e.classroom_id WHERE e.classroom_id=? AND e.student_id=?",new BooleanColumnMapRowMapper("active"),classId,studentId);
+        if(rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Học sinh không thuộc lớp này.");
+        return rows.getFirst();
+    }
 }

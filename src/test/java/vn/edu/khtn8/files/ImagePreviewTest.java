@@ -16,7 +16,7 @@ class ImagePreviewTest {
     final JdbcTemplate jdbc=mock(JdbcTemplate.class);
     final FileStorage storage=mock(FileStorage.class);
     final ForumService forum=mock(ForumService.class);
-    final FileService files=new FileService(jdbc,storage,forum,mock(StorageSettingsService.class),mock(R2Client.class));
+    final FileService files=new FileService(jdbc,storage,forum,mock(StorageSettingsService.class),mock(R2Client.class),mock(vn.edu.khtn8.community.SocialCommunityService.class));
     final AuthenticatedUser owner=new AuthenticatedUser(1L,"owner","Owner","unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_STUDENT")));
     final AuthenticatedUser other=new AuthenticatedUser(2L,"other","Other","unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_STUDENT")));
     final byte[] png=java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=");

@@ -1,0 +1,86 @@
+/* Small, optional interactions. Keep navigation, focus rings and layout unchanged. */
+:root { --motion-quick: 160ms; --motion-normal: 260ms; --motion-ease: cubic-bezier(.2, .75, .25, 1); }
+
+@media (prefers-reduced-motion: no-preference) {
+    .icon-button, .header-shortcuts a, .side-links a, .sidebar-account,
+    .discovery-tabs a, .feed-filters a, .feed-actions button, .btn,
+    .ai-chat-toggle, .ai-chat-suggestions button {
+        transition: background-color var(--motion-quick) ease, color var(--motion-quick) ease,
+            border-color var(--motion-quick) ease, box-shadow var(--motion-normal) var(--motion-ease),
+            transform var(--motion-quick) var(--motion-ease);
+    }
+    .icon-button .icon, .header-shortcuts .icon, .account-link .icon,
+    .side-links .icon, .sidebar-account .icon, .discovery-tabs .icon,
+    .subject-tile-art .icon, .learning-grid .icon, .utility-link .icon,
+    .feed-actions .icon, .ai-chat-toggle .icon, .ai-chat-avatar .icon {
+        transition: transform var(--motion-normal) var(--motion-ease);
+    }
+    .course-card, .subject-tile, .teacher-tile, .learning-grid > a, .feed-card {
+        transition: transform var(--motion-normal) var(--motion-ease),
+            box-shadow var(--motion-normal) var(--motion-ease), background-color var(--motion-quick) ease;
+    }
+    .course-cover .icon, .course-action > span[aria-hidden], .banner-copy .btn > span[aria-hidden] {
+        transition: transform var(--motion-normal) var(--motion-ease);
+    }
+    @media (hover: hover) and (pointer: fine) {
+        .icon-button:hover .icon, .header-shortcuts a:hover .icon,
+        .account-link:hover .icon, .side-links a:hover .icon,
+        .sidebar-account:hover .icon, .discovery-tabs a:hover .icon,
+        .subject-tile:hover .icon, .learning-grid > a:hover .icon,
+        .utility-link:hover .icon, .ai-chat-toggle:hover .icon { transform: translateY(-2px) scale(1.08); }
+        .feed-actions button:hover .icon { transform: scale(1.12); }
+        .course-card:hover, .subject-tile:hover, .teacher-tile:hover,
+        .learning-grid > a:hover, .feed-card:hover { transform: translateY(-3px); }
+        .course-card:hover .course-cover, .teacher-tile:hover, .feed-card:hover {
+            box-shadow: 0 10px 24px #24435d16;
+        }
+        .course-card:hover .course-cover .icon { transform: translateY(-3px) rotate(-7deg); }
+        .course-card:hover .course-action > span[aria-hidden],
+        .banner-copy .btn:hover > span[aria-hidden] { transform: translateX(4px); }
+        .btn:not(:disabled):hover, .ai-chat-toggle:hover { transform: translateY(-2px); }
+    }
+    .icon-button:focus-visible .icon, .header-shortcuts a:focus-visible .icon,
+    .side-links a:focus-visible .icon, .discovery-tabs a:focus-visible .icon,
+    .subject-tile:focus-visible .icon, .feed-actions button:focus-visible .icon { transform: translateY(-2px) scale(1.08); }
+    .btn:not(:disabled):active, .icon-button:not(:disabled):active,
+    .feed-actions button:not(:disabled):active { transform: scale(.97); }
+
+    .home-banner .banner-book, .auth-story .banner-book {
+        animation: motion-book-enter 640ms var(--motion-ease) both;
+    }
+    .home-banner .formula, .auth-story .formula {
+        animation: motion-detail-enter 480ms var(--motion-ease) both;
+        animation-delay: 180ms;
+    }
+    .ai-chat-dialog[open] { animation: motion-dialog-enter 240ms var(--motion-ease) both; }
+    .ai-chat-message:not(:first-child) { animation: motion-message-enter 220ms var(--motion-ease) both; }
+    .feed-actions button[aria-pressed="true"] .icon { transform: scale(1.12); }
+
+    /* Added by motion.js only for off-screen elements; CSS/JS disabled => visible content. */
+    .motion-pending { opacity: 0; transform: translateY(14px); }
+    .motion-pending.motion-visible {
+        opacity: 1; transform: translateY(0);
+        transition: opacity 480ms var(--motion-ease), transform 480ms var(--motion-ease);
+    }
+}
+
+@keyframes motion-book-enter {
+    from { opacity: .65; transform: translateY(12px) rotate(-14deg); }
+    to { opacity: 1; transform: translateY(0) rotate(-10deg); }
+}
+@keyframes motion-detail-enter {
+    from { opacity: 0; translate: 0 8px; }
+    to { opacity: 1; translate: 0 0; }
+}
+@keyframes motion-dialog-enter {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes motion-message-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .motion-pending, .motion-pending.motion-visible { opacity: 1 !important; transform: none !important; }
+}

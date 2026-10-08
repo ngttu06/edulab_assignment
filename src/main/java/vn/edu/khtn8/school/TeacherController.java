@@ -22,10 +22,47 @@ public class TeacherController {
     private final TeacherClassService classes;
     private final QuizCsv csv;
     public TeacherController(TeacherAuthoringService authoring,TeacherClassService classes,QuizCsv csv) {this.authoring=authoring;this.classes=classes;this.csv=csv;}
-    @GetMapping({"/teacher/lessons","/teacher/quizzes"})
-    public String workspace(@AuthenticationPrincipal AuthenticatedUser user,Model model) {
-        model.addAttribute("data",authoring.data(user));return page(model,"teacher/authoring","Soạn bài học & quiz");
+    @GetMapping("/teacher/{kind:lessons|quizzes}")
+    public String workspace(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String kind,Model model) {
+        model.addAttribute("data",authoring.data(user));model.addAttribute("kind",kind);
+        return page(model,"teacher/content-list",kind.equals("lessons")?"Bài học":"Quiz");
     }
+    @GetMapping("/teacher/{kind:lessons|quizzes}/new")
+    public String newContent(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String kind,Model model) {
+        model.addAttribute("data",authoring.data(user));model.addAttribute("kind",kind);
+        return page(model,"teacher/"+(kind.equals("lessons")?"lesson-form":"quiz-form"),"Tạo mới");
+    }
+    @GetMapping("/teacher/quizzes/import")
+    public String importContent(@AuthenticationPrincipal AuthenticatedUser user,Model model) {
+        model.addAttribute("data",authoring.data(user));model.addAttribute("kind","quizzes");model.addAttribute("importMode",true);
+        return page(model,"teacher/quiz-form","Nhập quiz từ CSV");
+    }
+    @GetMapping("/teacher/{kind:lessons|quizzes}/{id}")
+    public String detail(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String kind,@PathVariable long id,Model model) {
+        model.addAttribute("item",kind.equals("lessons")?authoring.lesson(user,id):authoring.quiz(user,id));model.addAttribute("kind",kind);
+        return page(model,"teacher/content-detail","Chi tiết nội dung");
+    }
+    @GetMapping("/teacher/{kind:lessons|quizzes}/{id}/edit")
+    public String edit(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String kind,@PathVariable long id,Model model) {
+        var item=kind.equals("lessons")?authoring.lesson(user,id):authoring.quiz(user,id);
+        if(item.get("deleted_at")!=null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Nội dung đã xóa.");
+        model.addAttribute("data",authoring.data(user));model.addAttribute("kind",kind);model.addAttribute("editId",id);
+        return page(model,"teacher/"+(kind.equals("lessons")?"lesson-form":"quiz-form"),"Chỉnh sửa");
+    }
+    @DeleteMapping("/api/v1/teacher/lessons/{id}") @ResponseBody
+    public void deleteLesson(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id) {authoring.deleteLesson(user,id);}
+    @DeleteMapping("/api/v1/teacher/quizzes/{id}") @ResponseBody
+    public void deleteQuiz(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id) {authoring.deleteQuiz(user,id);}
+    @PostMapping("/api/v1/teacher/lessons/{id}/duplicate") @ResponseBody
+    public Map<String,Long> duplicateLesson(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id) {return Map.of("id",authoring.duplicateLesson(user,id));}
+    public record Preview(@NotNull @Size(max=100000) String html) { }
+    @PostMapping("/api/v1/teacher/lessons/preview") @ResponseBody
+    public Map<String,String> previewLesson(@AuthenticationPrincipal AuthenticatedUser user,@Valid @RequestBody Preview input) {
+        SchoolService.require(user,"TEACHER","ADMIN");
+        return Map.of("html",org.jsoup.Jsoup.clean(input.html(),org.jsoup.safety.Safelist.basic().addTags("h2","h3","h4")));
+    }
+    @PostMapping("/api/v1/teacher/quizzes/{id}/duplicate") @ResponseBody
+    public Map<String,Long> duplicateQuiz(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id) {return Map.of("id",authoring.duplicateQuiz(user,id));}
     @GetMapping("/api/v1/teacher/lessons/{id}") @ResponseBody
     public Map<String,Object> lesson(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id) {return authoring.lesson(user,id);}
     @PostMapping("/api/v1/teacher/lessons") @ResponseBody
@@ -60,8 +97,8 @@ public class TeacherController {
     public void membership(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id,@PathVariable long studentId,@RequestBody Membership input) {classes.membership(user,id,studentId,input.active());}
     @GetMapping("/teacher/classes/{id}/students/{studentId}")
     public String report(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id,@PathVariable long studentId,Model model) {
-        model.addAttribute("report",classes.report(user,id,studentId));model.addAttribute("classId",id);model.addAttribute("studentId",studentId);
-        return page(model,"teacher/report","Tiến độ & điểm theo lớp");
+        model.addAttribute("student",classes.member(user,id,studentId));model.addAttribute("classId",id);model.addAttribute("studentId",studentId);
+        return page(model,"teacher/student-detail","Thành viên lớp học");
     }
     @GetMapping("/api/v1/teacher/classes/{id}/students/{studentId}/report") @ResponseBody
     public Map<String,Object> reportApi(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable long id,@PathVariable long studentId) {return classes.report(user,id,studentId);}

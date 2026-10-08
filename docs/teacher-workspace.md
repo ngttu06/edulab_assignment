@@ -7,7 +7,7 @@ giáo viên vào lớp trước khi giáo viên tạo nội dung cho lớp đó.
 
 ### Bài học
 
-Vào **Soạn bài học & quiz** (`/edulab/teacher/lessons`): chọn chủ đề,
+Vào **Bài học của tôi** (`/edulab/teacher/lessons`), chọn **Thêm mới**: chọn chủ đề,
 nhập tiêu đề, mô tả, mục tiêu, nội dung và thời lượng; chọn ít nhất một lớp.
 Lưu nháp, xuất bản hoặc lưu trữ. Chọn bài học trong danh sách để chỉnh sửa.
 Nội dung nhận HTML cơ bản được lọc bằng Jsoup; không hỗ trợ script/iframe.
@@ -15,7 +15,7 @@ Mỗi lần lưu tạo một phiên bản mới. Tiến độ học đã có kh�
 
 ### Quiz trực tiếp
 
-Tại mục **Quiz của tôi** (`/edulab/teacher/quizzes#quizEditor`):
+Tại mục **Quiz của tôi** (`/edulab/teacher/quizzes`), chọn **Thêm mới**:
 
 1. Nhập tiêu đề, thời lượng 1–600 phút và số lượt làm 1–100.
 2. Chọn luyện tập hoặc kiểm tra. Bài kiểm tra xuất bản cần thời điểm công bố
@@ -32,6 +32,7 @@ khỏi phạm vi quiz nếu quiz đã được giao cho lớp đó; có thể �
 
 ### Nhập CSV và file mẫu
 
+- Trang riêng: `/edulab/teacher/quizzes/import`; không nhập CSV trên trang chỉnh sửa quiz.
 - Nút **Tải file CSV mẫu** tải `/edulab/teacher/quizzes/template.csv`.
 - File nguồn: `src/main/resources/templates/quiz-mau.csv`.
 - Soạn bằng Excel/Google Sheets rồi xuất **CSV UTF-8**, không phải XLSX/DOCX/PDF.
@@ -83,8 +84,9 @@ tạo quiz riêng khi cần bài kiểm tra độc lập giữa các lớp.
 
 ## Triển khai
 
-Migration mới `V17__teacher_authoring.sql` thêm người tạo/phạm vi bài học,
-phạm vi quiz và hai bảng liên kết lớp. Không sửa migration cũ.
+V17 thêm người tạo/phạm vi bài học, phạm vi quiz và hai bảng liên kết lớp.
+V18 (`V18__teacher_workspace_crud.sql`) thêm dấu xóa/lưu trữ/hủy và bảng
+phiên bản nhận xét. Không sửa migration cũ. WAR mới yêu cầu schema V18.
 Chạy migration theo quy trình triển khai hiện có trước khi dùng WAR mới;
 không bật tự động migrate trên database remote. Sao lưu trước khi nâng cấp.
 
@@ -101,3 +103,77 @@ Upload ảnh/PDF trực tiếp tới object storage vẫn dùng cơ chế hiện
 - `src/test/browser/teacher-authoring.cjs`: chạy trên **database test dùng một lần**;
   tạo fixture và không tự xóa lịch sử. Yêu cầu `EDULAB_DISPOSABLE_TEST_DB=true`,
   `EDULAB_SMOKE_URL` loopback và Playwright/Chrome từ môi trường kiểm thử.
+
+## Workspace V18: trang riêng và CRUD
+
+Các đường dẫn bên dưới nằm sau context `/edulab`:
+
+| Chức năng | Đường dẫn |
+|---|---|
+| Bài học / quiz | `/teacher/lessons`, `/teacher/quizzes`; `/new`, `/{id}`, `/{id}/edit` |
+| CSV | `/teacher/quizzes/import` (xem trước, sửa câu hỏi và lưu quiz mới) |
+| Lớp | `/teacher/classes`; `/new`, `/{id}`, `/{id}/edit` |
+| Phân công giáo viên | `/teacher/classes/{id}/teachers` (admin) |
+| Thành viên lớp | `/teacher/classes/{id}/students`; `/new`, `/{studentId}` |
+| Bài giao | `/teacher/classes/{id}/assignments`; `/new`, `/{assignmentId}`, `/{assignmentId}/edit` |
+| Tiến độ / kết quả | `/teacher/classes/{id}/progress`, `/results`; tương tự dưới `/students/{studentId}` |
+| Nhận xét | `/teacher/students/{studentId}/feedback`; `/new`, `/{id}`, `/{id}/edit` |
+
+Danh sách không chứa biểu mẫu soạn nội dung. Trang chi tiết liên kết sang trang sửa;
+thao tác xóa có xác nhận và kiểm tra CSRF. Giáo viên chỉ quản lý lớp được phân công.
+
+### Quy tắc xóa và sửa
+
+- **Bài học:** xóa mềm và lưu trữ các phiên bản; giữ liên kết lớp và tiến độ.
+- **Quiz:** xóa mềm, ngừng xuất bản, hủy các bài giao liên quan. Không thay đổi snapshot,
+  câu hỏi hay điểm của lượt đã bắt đầu; học sinh vẫn xem/nộp lượt cũ qua ID lượt làm.
+- **Lớp:** chỉ admin tạo/sửa/lưu trữ. Lớp lưu trữ vẫn đọc được lịch sử, không nhận
+  thành viên, phân công, nội dung hoặc bài giao mới. Không xóa tài khoản học sinh.
+- **Thành viên:** ngừng tham gia/khôi phục; giáo viên vẫn xem tiến độ và kết quả
+  trong lớp của thành viên đã ngừng tham gia. Không cấp quyền quản trị tài khoản.
+- **Bài giao:** sửa hạn nộp, không đổi quiz hoặc thời điểm giao. Hủy không xóa
+  quiz/lượt làm và không chặn truy cập quiz còn xuất bản. Muốn đổi đề phải giao mới.
+- **Nhận xét:** tác giả hoặc admin sửa/xóa; bản trước khi sửa được giữ trong
+  `teacher_feedback_revisions`. Nhận xét xóa không còn hiển thị cho học sinh/phụ huynh.
+- **Điểm/tiến độ:** chỉ đọc; không có API chỉnh sửa thủ công trong workspace.
+- Nội dung xóa không thể xuất bản lại qua màn hình quản trị cũ. V18 chưa có
+  khôi phục nội dung/lớp đã xóa; khôi phục thành viên lớp vẫn được hỗ trợ.
+
+### Kiểm thử V18
+
+`TeacherMysqlTest` kiểm tra CRUD, tác giả/lớp, lưu trữ lớp, hủy bài giao,
+phiên bản nhận xét và bảo toàn tiến độ/snapshot. `TeacherSecurityTest` kiểm tra
+CSRF cho xóa và các view danh sách/form riêng.
+
+`src/test/browser/teacher-workspace.cjs` là workflow cho V18: tạo/sửa bài học,
+CSV, sửa quiz, giao/sửa/hủy bài giao, nhận xét, thành viên, lớp/admin, xóa mềm và
+kiểm tra trang tại 1440/768/390/320 px và encoding tiếng Việt của navigation.
+`teacher-authoring.cjs` chuyển tiếp sang suite này để giữ lệnh chạy cũ tương thích.
+Chỉ chạy trên database test dùng một lần, đặt `EDULAB_DISPOSABLE_TEST_DB=true`,
+`EDULAB_SMOKE_URL` loopback, `EDULAB_PLAYWRIGHT_PATH` và `EDULAB_CHROME_PATH`
+nếu cần. Chạy bộ Java test trước browser để fixture browser không làm lệch số đếm.
+
+## Tổng quan giảng dạy và theo dõi lớp
+
+- `/teacher`: tổng quan giáo viên, số lớp đang phụ trách, số thành viên đang học theo
+  từng lớp, nội dung nháp và tối đa sáu bài sắp đến hạn. `/dashboard` của giáo viên
+  dẫn tới đây; admin tiếp tục dùng `/admin` và có thể mở `/teacher` trực tiếp.
+- `/teacher/classes/{id}`: sĩ số đang học, số bài học đã xuất bản và năm bài giao gần
+  nhất. `/teacher/assignments`: tối đa 200 bài giao gần nhất ở các lớp được phân công;
+  lọc tại trình duyệt theo tên quiz/lớp và trạng thái. Bài đã hủy vẫn đọc được.
+- Chi tiết bài giao liệt kê học sinh kể cả người ngừng tham gia; dấu hoàn thành chỉ
+  tính lượt **đã chấm** nộp từ lúc giao đến hạn. Một quiz được giao nhiều lần có thể
+  có kết quả tổng hợp khác tình trạng của từng lần giao.
+- `/teacher/classes/{id}/results`: bảng điểm tất cả thành viên (bao gồm đã ngừng),
+  lọc tại trình duyệt theo học sinh/quiz và đã chấm/chưa có điểm. Xuất toàn bộ dữ liệu
+  của lớp qua `/teacher/classes/{id}/results.csv`: CSV UTF-8 BOM, điểm chưa có để trống,
+  văn bản escape dấu nháy và tiền tố chống công thức khi mở bằng bảng tính. Đường dẫn
+  xuất vẫn kiểm tra phân công lớp ở backend; dữ liệu học sinh chỉ nên lưu ở nơi an toàn.
+- Danh sách bài học/quiz lọc tại trình duyệt theo tiêu đề/trạng thái. Nút **Nhân bản
+  nháp** tạo bài/quiz mới với câu hỏi và phạm vi lớp được giữ, quiz mới chưa xuất bản;
+  không sao chép lượt làm, điểm hay tiến độ. Chỉ tác giả/admin còn được phân công vào
+  các lớp liên kết mới có thể nhân bản. Bài học có nút xem trước HTML đã lọc tại server;
+  thay đổi chưa lưu sẽ được cảnh báo khi rời trang.
+- Các mốc thời gian hiển thị UTC ở trang xem, trường nhập hạn nộp sử dụng giờ thiết bị.
+  Các bộ lọc danh sách chạy trên dữ liệu đã trả về (không phân trang tại server); bài
+  giao tổng hợp giới hạn 200 dòng, trang kết quả toàn lớp hiện chưa phân trang.

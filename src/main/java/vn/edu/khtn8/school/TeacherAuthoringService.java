@@ -27,13 +27,13 @@ public class TeacherAuthoringService {
         SchoolService.require(user,"TEACHER","ADMIN");
         return Map.of("classes",school.classrooms(user),
                 "topics",jdbc.queryForList("SELECT t.id,CONCAT(s.name,' · ',c.title,' · ',t.name) name FROM topics t JOIN courses c ON c.id=t.course_id JOIN subjects s ON s.id=c.subject_id ORDER BY s.grade_level,c.id,t.display_order"),
-                "lessons",jdbc.queryForList("SELECT id,title,status FROM lessons WHERE class_only=TRUE AND (? OR created_by=?) ORDER BY id DESC",SchoolService.hasRole(user,"ADMIN"),user.id()),
-                "quizzes",jdbc.queryForList("SELECT id,title,published,mode FROM quizzes WHERE class_only=TRUE AND (? OR created_by=?) ORDER BY id DESC",SchoolService.hasRole(user,"ADMIN"),user.id()));
+                "lessons",jdbc.queryForList("SELECT id,title,status,deleted_at FROM lessons WHERE class_only=TRUE AND (? OR created_by=?) ORDER BY id DESC",SchoolService.hasRole(user,"ADMIN"),user.id()),
+                "quizzes",jdbc.queryForList("SELECT id,title,published,mode,deleted_at FROM quizzes WHERE class_only=TRUE AND (? OR created_by=?) ORDER BY id DESC",SchoolService.hasRole(user,"ADMIN"),user.id()));
     }
     private void validate(Object input) {if(!validator.validate(input).isEmpty()) throw bad("Dữ liệu không hợp lệ. Kiểm tra các trường bắt buộc và giới hạn.");}
     private void classes(AuthenticatedUser user,List<Long> ids) {
         if(ids.stream().distinct().count()!=ids.size()) throw bad("Không chọn lớp trùng nhau.");
-        for(long id:ids) school.authorizeClass(user,id);
+        for(long id:ids) school.requireActiveClass(user,id);
     }
     private Map<String,Object> owned(AuthenticatedUser user,String table,long id,boolean lock) {
         SchoolService.require(user,"TEACHER","ADMIN");
@@ -41,6 +41,7 @@ public class TeacherAuthoringService {
         if(rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy nội dung.");
         var row=rows.getFirst();
         if(!SchoolService.hasRole(user,"ADMIN") && (row.get("created_by")==null || ((Number)row.get("created_by")).longValue()!=user.id())) throw new AccessDeniedException("Not content owner");
+        if(lock && row.get("deleted_at")!=null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Nội dung đã xóa; không thể chỉnh sửa.");
         // A former teacher must not change content still shared with a class they no longer teach.
         String links=table.equals("lessons")?"class_lessons":"quiz_classes",column=table.equals("lessons")?"lesson_id":"quiz_id";
         for(long classId:jdbc.queryForList("SELECT classroom_id FROM "+links+" WHERE "+column+"=?",Long.class,id)) school.authorizeClass(user,classId);
@@ -77,6 +78,32 @@ public class TeacherAuthoringService {
         row.put("classIds",jdbc.queryForList("SELECT classroom_id FROM quiz_classes WHERE quiz_id=?",Long.class,id));return row;
     }
     @Transactional
+    public long duplicateLesson(AuthenticatedUser user,long id) {
+        var original=lesson(user,id);
+        if(original.get("deleted_at")!=null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể nhân bản nội dung đã xóa.");
+        return saveLesson(user,null,new LessonInput(((Number)original.get("topic_id")).longValue(),
+                copyTitle((String)original.get("title")),(String)original.get("summary"),
+                ((Number)original.get("duration_minutes")).intValue(),(String)original.get("objectives"),
+                (String)original.get("content_html"),"DRAFT",castIds(original.get("classIds"))));
+    }
+    @Transactional
+    public long duplicateQuiz(AuthenticatedUser user,long id) {
+        var original=quiz(user,id);
+        if(original.get("deleted_at")!=null) throw new ResponseStatusException(HttpStatus.CONFLICT,"Không thể nhân bản nội dung đã xóa.");
+        @SuppressWarnings("unchecked") var questions=(List<QuestionInput>)original.get("questions");
+        return saveQuiz(user,null,new QuizInput(copyTitle((String)original.get("title")),
+                ((Number)original.get("duration_minutes")).intValue(),((Number)original.get("max_attempts")).intValue(),
+                (String)original.get("mode"),null,false,questions,castIds(original.get("classIds"))));
+    }
+    private static String copyTitle(String title) {
+        String suffix=" (bản sao)";
+        return title.substring(0,Math.min(title.length(),200-suffix.length()))+suffix;
+    }
+    private static List<Long> castIds(Object value) {
+        @SuppressWarnings("unchecked") var ids=(List<Long>)value;
+        return ids;
+    }
+    @Transactional
     public long saveQuiz(AuthenticatedUser user,Long id,QuizInput input) {
         SchoolService.require(user,"TEACHER","ADMIN");validate(input);classes(user,input.classIds());
         if(id!=null) owned(user,"quizzes",id,true);
@@ -103,6 +130,20 @@ public class TeacherAuthoringService {
         jdbc.update("DELETE FROM quiz_classes WHERE quiz_id=?",id);
         for(long classId:input.classIds()) jdbc.update("INSERT INTO quiz_classes(classroom_id,quiz_id) VALUES(?,?)",classId,id);
         audit(user,"SAVE_QUIZ","quiz",id);return id;
+    }
+    @Transactional
+    public void deleteLesson(AuthenticatedUser user,long id) {
+        owned(user,"lessons",id,true);
+        jdbc.update("UPDATE lessons SET deleted_at=CURRENT_TIMESTAMP(6),status='ARCHIVED' WHERE id=?",id);
+        jdbc.update("UPDATE lesson_versions SET status='ARCHIVED' WHERE lesson_id=?",id);
+        audit(user,"DELETE_LESSON","lesson",id);
+    }
+    @Transactional
+    public void deleteQuiz(AuthenticatedUser user,long id) {
+        owned(user,"quizzes",id,true);
+        jdbc.update("UPDATE quizzes SET deleted_at=CURRENT_TIMESTAMP(6),published=FALSE WHERE id=?",id);
+        jdbc.update("UPDATE class_assignments SET cancelled_at=CURRENT_TIMESTAMP(6) WHERE quiz_id=? AND cancelled_at IS NULL",id);
+        audit(user,"DELETE_QUIZ","quiz",id);
     }
     private void audit(AuthenticatedUser user,String action,String type,long id) {jdbc.update("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)",user.id(),action,type,String.valueOf(id));}
     private long insert(String sql,Object...args) {

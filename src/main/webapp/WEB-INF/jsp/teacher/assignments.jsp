@@ -1,0 +1,5 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="class-nav.jspf" %>
+<h1 class="h3">Bài đã giao</h1><c:if test="${empty classroom.archived_at}"><a class="btn btn-primary mb-3" href="${pageContext.request.contextPath}/teacher/classes/${classId}/assignments/new">Giao quiz mới</a></c:if>
+<ul class="list-group"><c:forEach var="item" items="${assignments}"><li class="list-group-item"><a href="${pageContext.request.contextPath}/teacher/classes/${classId}/assignments/${item.id}"><c:out value="${item.title}"/></a><p class="small mb-0">${empty item.cancelled_at ? 'Đã giao' : 'Đã hủy'} · Hạn (UTC): <c:out value="${item.due_at}"/> · Hoàn thành đúng hạn: ${item.completed_count}/${item.student_count}</p></li></c:forEach></ul><c:if test="${empty assignments}"><p>Chưa giao bài cho lớp.</p></c:if>

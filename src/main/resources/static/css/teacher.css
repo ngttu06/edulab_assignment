@@ -1,0 +1,20 @@
+.teacher-nav,.teacher-class-nav { display:flex; gap:6px; overflow-x:auto; scrollbar-width:thin; border-bottom:1px solid var(--line); padding-bottom:8px; }
+.teacher-nav a,.teacher-class-nav a { flex:0 0 auto; padding:10px 14px; border-radius:8px; color:var(--ink); font-weight:700; white-space:nowrap; }
+.teacher-nav a:hover,.teacher-class-nav a:hover { background:var(--soft-blue); }
+.teacher-nav a.is-active,.teacher-class-nav a.is-active { color:var(--primary); background:var(--soft-blue); }
+.teacher-breadcrumb { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.teacher-heading { display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:16px; margin-bottom:24px; }
+.teacher-heading h1 { margin:4px 0 8px; }.teacher-heading p { color:var(--muted); margin:0; max-width:65ch; }
+.teacher-heading .btn { flex-shrink:0; }
+.teacher-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:14px; margin:0 0 28px; }
+.teacher-stats>div { background:var(--soft-blue); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; }
+.teacher-stats dt { font-size:13px; color:var(--muted); font-weight:700; }.teacher-stats dd { font-size:26px; color:var(--primary); font-weight:700; line-height:1.2; margin:8px 0 0; }
+.teacher-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; }
+.teacher-section-heading { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin:18px 0 14px; }.teacher-section-heading h2 { font-size:18px; margin:0; }
+.teacher-badge { display:inline-block; border-radius:999px; padding:3px 10px; font-weight:700; background:var(--soft-blue); color:var(--primary); }
+.teacher-badge.is-muted { background:#f0f1f3; color:#4b5563; }.teacher-badge.is-live { background:#e5f4eb; color:#226348; }
+.teacher-table { max-width:100%; }.teacher-table th { white-space:nowrap; }.teacher-table td { min-width:105px; }
+.teacher-nav [hidden],.teacher-class-nav [hidden],#teacherContentItems [hidden],.teacher-table [hidden] { display:none!important; }
+.teacher-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+@media(max-width:767px) { .teacher-columns { grid-template-columns:1fr; gap:16px; }.teacher-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }.teacher-nav a,.teacher-class-nav a { padding:9px 10px; } }
+@media(max-width:360px) { .teacher-stats { grid-template-columns:1fr 1fr; gap:8px; }.teacher-stats>div { padding:12px; } }

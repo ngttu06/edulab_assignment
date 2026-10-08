@@ -16,7 +16,7 @@
         <a data-nav href="${pageContext.request.contextPath}/courses" aria-label="Khóa học" title="Khóa học"><ui:icon name="cap"/></a>
         <a data-nav href="${pageContext.request.contextPath}/lessons" aria-label="Bài học" title="Bài học"><ui:icon name="book"/></a>
         <a data-nav href="${pageContext.request.contextPath}/quizzes" aria-label="Luyện tập" title="Luyện tập"><ui:icon name="quiz"/></a>
-        <a data-nav href="${pageContext.request.contextPath}/forum" aria-label="Diễn đàn" title="Diễn đàn"><ui:icon name="chat"/></a>
+        <a data-nav href="${pageContext.request.contextPath}/community" aria-label="Cộng đồng" title="Cộng đồng"><ui:icon name="users"/></a>
     </nav>
     <div class="header-account">
         <c:choose>

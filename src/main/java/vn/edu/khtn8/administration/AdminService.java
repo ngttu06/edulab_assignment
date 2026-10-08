@@ -25,8 +25,8 @@ public class AdminService {
         SchoolService.require(user,"ADMIN");
         return Map.of("users",jdbc.queryForList("SELECT id,username,full_name,role,enabled FROM users ORDER BY id DESC LIMIT 200"),
                 "topics",jdbc.queryForList("SELECT id,name FROM topics ORDER BY display_order,id"),
-                "lessons",jdbc.queryForList("SELECT id,title,status,prerequisite_id,required_score FROM lessons ORDER BY id DESC LIMIT 200"),
-                "quizzes",jdbc.queryForList("SELECT id,title,published FROM quizzes ORDER BY id DESC LIMIT 200"),
+                "lessons",jdbc.queryForList("SELECT id,title,status,prerequisite_id,required_score FROM lessons WHERE deleted_at IS NULL ORDER BY id DESC LIMIT 200"),
+                "quizzes",jdbc.queryForList("SELECT id,title,published FROM quizzes WHERE deleted_at IS NULL ORDER BY id DESC LIMIT 200"),
                 "questions",jdbc.queryForList("SELECT id,content,difficulty FROM questions WHERE active=TRUE ORDER BY id DESC LIMIT 200"));
     }
 
@@ -68,7 +68,7 @@ public class AdminService {
         if (jdbc.queryForList("SELECT id FROM lessons WHERE id=? FOR UPDATE",id).isEmpty()) throw bad("Không tìm thấy bài học.");
         if (publish && jdbc.queryForList("SELECT id FROM lesson_versions WHERE lesson_id=?",id).isEmpty()) throw bad("Bài học chưa có nội dung.");
         String status=publish?"PUBLISHED":"ARCHIVED";
-        jdbc.update("UPDATE lessons SET status=? WHERE id=?",status,id);
+        if(jdbc.update("UPDATE lessons SET status=? WHERE id=? AND deleted_at IS NULL",status,id)==0) throw bad("Bài học không tồn tại hoặc đã xóa.");
         jdbc.update("UPDATE lesson_versions SET status=? WHERE lesson_id=?",status,id);
         audit(actor,publish?"PUBLISH_LESSON":"ARCHIVE_LESSON","lesson",id);
     }
@@ -100,7 +100,7 @@ public class AdminService {
 
     public void publishQuiz(AuthenticatedUser actor,long id,boolean publish) {
         SchoolService.require(actor,"ADMIN");
-        if(jdbc.update("UPDATE quizzes SET published=? WHERE id=?",publish,id)==0) throw bad("Không tìm thấy quiz.");
+        if(jdbc.update("UPDATE quizzes SET published=? WHERE id=? AND deleted_at IS NULL",publish,id)==0) throw bad("Quiz không tồn tại hoặc đã xóa.");
         audit(actor,publish?"PUBLISH_QUIZ":"HIDE_QUIZ","quiz",id);
     }
     private void audit(AuthenticatedUser actor,String action,String type,long id) {

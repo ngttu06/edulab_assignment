@@ -79,11 +79,15 @@ class CloudComposeTest(unittest.TestCase):
         self.assertEqual(app["depends_on"]["migrate"]["condition"], "service_completed_successfully")
         self.assertEqual(config["services"]["migrate"]["command"], ["migrate"])
 
-    def test_local_fixture_requires_explicit_compose_file(self):
-        config = self.config("compose.local.yml")
-        self.assertEqual(set(config["services"]), {"mysql"})
-        script = (ROOT / "run-local.sh").read_text()
-        self.assertIn('docker compose -f "$PWD/compose.local.yml"', script)
+    def test_no_local_mysql_deployment_fallback(self):
+        self.assertFalse((ROOT / "compose.local.yml").exists())
+        self.assertFalse((ROOT / "run-local.sh").exists())
+        for name in ("application.yml", "application-remote.yml"):
+            source = (ROOT / "src/main/resources" / name).read_text()
+            self.assertIn("url: ${EDULAB_DB_URL}", source)
+            self.assertIn("username: ${EDULAB_DB_USERNAME}", source)
+            self.assertIn("password: ${EDULAB_DB_PASSWORD}", source)
+            self.assertNotIn("jdbc:mysql://localhost", source)
 
 
 if __name__ == "__main__":

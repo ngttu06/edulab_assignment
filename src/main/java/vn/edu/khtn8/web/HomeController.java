@@ -28,7 +28,7 @@ public class HomeController {
     @GetMapping("/dashboard")
     public String dashboard(Model model, @AuthenticationPrincipal AuthenticatedUser user) {
         if (SchoolService.hasRole(user,"ADMIN")) return "redirect:/admin";
-        if (SchoolService.hasRole(user, "TEACHER")) return "redirect:/teacher/classes";
+        if (SchoolService.hasRole(user, "TEACHER")) return "redirect:/teacher";
         if (SchoolService.hasRole(user, "PARENT")) return "redirect:/family";
         model.addAttribute("report", school.report(user, user.id()));
         model.addAttribute("assignments",assignments.forStudent(user,user.id()));

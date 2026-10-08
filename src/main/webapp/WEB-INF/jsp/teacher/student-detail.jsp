@@ -1,0 +1,7 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="class-nav.jspf" %>
+<h1 class="h3"><c:out value="${student.full_name}"/></h1><p><c:out value="${student.username}"/> · ${student.active ? 'Đang theo học' : 'Đã ngừng tham gia'}</p>
+<p id="classNotice" role="status" aria-live="polite"></p>
+<div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary" href="${pageContext.request.contextPath}/teacher/classes/${classId}/students/${studentId}/progress">Tiến độ bài học</a><a class="btn btn-outline-primary" href="${pageContext.request.contextPath}/teacher/classes/${classId}/students/${studentId}/results">Kết quả quiz &amp; lượt làm</a><c:if test="${student.active}"><a class="btn btn-outline-primary" href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback?classId=${classId}">Nhận xét</a></c:if><c:if test="${empty student.archived_at}"><button class="btn btn-outline-secondary" data-class="${classId}" data-membership="${studentId}" data-active="${not student.active}">${student.active ? 'Ngừng tham gia' : 'Khôi phục'}</button></c:if></div>
+<script src="${pageContext.request.contextPath}/js/teacher-class.js" defer></script>

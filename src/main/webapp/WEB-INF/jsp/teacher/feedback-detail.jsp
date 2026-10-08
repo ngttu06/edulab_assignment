@@ -1,0 +1,6 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="nav.jspf" %>
+<a href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback">← Nhận xét</a><h1 class="h3 mt-3">Chi tiết nhận xét</h1><p><c:out value="${item.teacher}"/> · <c:out value="${item.created_at}"/> UTC</p><p class="text-break"><c:out value="${item.body}"/></p>
+<p id="workspaceNotice" role="status" aria-live="polite"></p><c:if test="${item.teacher_id == actorId or pageContext.request.isUserInRole('ADMIN')}"><a class="btn btn-primary" href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback/${item.id}/edit">Chỉnh sửa</a><button class="btn btn-outline-danger" data-delete="/api/v1/teacher/students/${studentId}/feedback/${item.id}" data-return="/teacher/students/${studentId}/feedback" data-confirm="Xóa nhận xét khỏi màn hình học sinh/phụ huynh? Bản ghi vẫn được giữ để đối soát.">Xóa nhận xét</button></c:if>
+<script src="${pageContext.request.contextPath}/js/teacher-workspace.js" defer></script>

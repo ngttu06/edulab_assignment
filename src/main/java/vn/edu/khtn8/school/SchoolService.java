@@ -36,7 +36,7 @@ public class SchoolService {
         require(user, "TEACHER", "ADMIN");
         return jdbc.queryForList("""
                 SELECT c.id,c.name,y.name academic_year FROM classrooms c JOIN academic_years y ON y.id=c.academic_year_id
-                WHERE ? OR EXISTS(SELECT 1 FROM class_teachers t WHERE t.classroom_id=c.id AND t.teacher_id=?) ORDER BY c.id
+                WHERE c.archived_at IS NULL AND (? OR EXISTS(SELECT 1 FROM class_teachers t WHERE t.classroom_id=c.id AND t.teacher_id=?)) ORDER BY c.id
                 """, hasRole(user, "ADMIN"), user.id());
     }
     public List<Map<String, Object>> students(AuthenticatedUser user, long classId) {
@@ -60,6 +60,10 @@ public class SchoolService {
                 WHERE t.teacher_id=? AND e.student_id=? AND e.active=TRUE)
                 """, user.id(), studentId)) return;
         throw new AccessDeniedException("Student not linked");
+    }
+    public String studentName(AuthenticatedUser user,long studentId) {
+        require(user,"TEACHER","ADMIN");authorizeStudent(user,studentId);
+        return jdbc.queryForObject("SELECT full_name FROM users WHERE id=?",String.class,studentId);
     }
     public Map<String, Object> report(AuthenticatedUser user, long studentId) {
         authorizeStudent(user, studentId);
@@ -119,11 +123,13 @@ public class SchoolService {
     }
     public void enroll(AuthenticatedUser user, long classId, long studentId) {
         require(user, "ADMIN");
+        requireActiveClass(user,classId);
         if (!exists("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND role='STUDENT' AND enabled=TRUE)", studentId)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Học sinh không hợp lệ.");
         jdbc.update("INSERT INTO class_enrollments(classroom_id,student_id) VALUES(?,?) ON DUPLICATE KEY UPDATE active=TRUE", classId, studentId);
     }
     public void assign(AuthenticatedUser user, long classId, long teacherId) {
         require(user, "ADMIN");
+        requireActiveClass(user,classId);
         if (!exists("SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND role='TEACHER' AND enabled=TRUE)", teacherId)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Giáo viên không hợp lệ.");
         jdbc.update("INSERT INTO class_teachers(classroom_id,teacher_id) VALUES(?,?) ON DUPLICATE KEY UPDATE teacher_id=VALUES(teacher_id)", classId, teacherId);
     }
@@ -137,10 +143,55 @@ public class SchoolService {
     }
     public void createClass(AuthenticatedUser user, long yearId, String name) {
         require(user, "ADMIN");
+        validateClass(yearId,name,null);
         jdbc.update("INSERT INTO classrooms(academic_year_id,name,grade_level) VALUES(?,?,8)", yearId, name.trim());
+    }
+    public void requireActiveClass(AuthenticatedUser user,long id) {
+        authorizeClass(user,id);
+        if(exists("SELECT EXISTS(SELECT 1 FROM classrooms WHERE id=? AND archived_at IS NOT NULL)",id))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Lớp đã lưu trữ; chỉ được xem lịch sử.");
+    }
+    public Map<String,Object> classroom(AuthenticatedUser user,long id) {
+        authorizeClass(user,id);
+        return jdbc.queryForMap("SELECT c.*,y.name academic_year FROM classrooms c JOIN academic_years y ON y.id=c.academic_year_id WHERE c.id=?",id);
+    }
+    public List<Map<String,Object>> archivedClasses(AuthenticatedUser user) {
+        require(user,"TEACHER","ADMIN");
+        return jdbc.queryForList("SELECT c.id,c.name,y.name academic_year FROM classrooms c JOIN academic_years y ON y.id=c.academic_year_id WHERE c.archived_at IS NOT NULL AND (? OR EXISTS(SELECT 1 FROM class_teachers t WHERE t.classroom_id=c.id AND t.teacher_id=?)) ORDER BY c.id DESC",hasRole(user,"ADMIN"),user.id());
+    }
+    private void validateClass(long yearId,String name,Long id) {
+        if(name==null || name.isBlank() || name.trim().length()>80 || !exists("SELECT EXISTS(SELECT 1 FROM academic_years WHERE id=?)",yearId))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Năm học hoặc tên lớp không hợp lệ.");
+        if(exists("SELECT EXISTS(SELECT 1 FROM classrooms WHERE academic_year_id=? AND name=? AND (? IS NULL OR id<>?))",yearId,name.trim(),id,id))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Tên lớp đã tồn tại trong năm học này.");
+    }
+    @Transactional
+    public void updateClass(AuthenticatedUser user,long id,long yearId,String name) {
+        require(user,"ADMIN");requireActiveClass(user,id);validateClass(yearId,name,id);
+        jdbc.update("UPDATE classrooms SET academic_year_id=?,name=? WHERE id=?",yearId,name.trim(),id);
+        audit(user,"UPDATE_CLASS","classroom",id);
+    }
+    @Transactional
+    public void archiveClass(AuthenticatedUser user,long id) {
+        require(user,"ADMIN");requireActiveClass(user,id);
+        jdbc.update("UPDATE classrooms SET archived_at=CURRENT_TIMESTAMP(6) WHERE id=?",id);
+        audit(user,"ARCHIVE_CLASS","classroom",id);
+    }
+    void audit(AuthenticatedUser user,String action,String resource,long id) {
+        jdbc.update("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)",user.id(),action,resource,String.valueOf(id));
     }
     static String hash(String code) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(code.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException ex) { throw new IllegalStateException(ex); }
+    }
+    public List<Map<String,Object>> teachers(AuthenticatedUser user,long classId) {
+        require(user,"ADMIN");authorizeClass(user,classId);
+        return jdbc.queryForList("SELECT u.id,u.full_name,u.username FROM class_teachers t JOIN users u ON u.id=t.teacher_id WHERE t.classroom_id=?",classId);
+    }
+    @Transactional
+    public void unassign(AuthenticatedUser user,long classId,long teacherId) {
+        require(user,"ADMIN");requireActiveClass(user,classId);
+        jdbc.update("DELETE FROM class_teachers WHERE classroom_id=? AND teacher_id=?",classId,teacherId);
+        audit(user,"UNASSIGN_TEACHER","classroom",classId);
     }
 }

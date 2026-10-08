@@ -1,0 +1,5 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="nav.jspf" %>
+<h1 class="h3">Nhận xét · <c:out value="${studentName}"/></h1><p>Nhận xét được chia sẻ với học sinh và phụ huynh đã liên kết. Chỉ tác giả hoặc admin được sửa/xóa.</p><a class="btn btn-primary mb-3" href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback/new">Thêm nhận xét</a>
+<ul class="list-group"><c:forEach var="item" items="${feedback}"><li class="list-group-item"><a href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback/${item.id}"><c:out value="${item.body}"/></a><p class="small mb-0"><c:out value="${item.teacher}"/> · <c:out value="${item.created_at}"/> UTC</p></li></c:forEach></ul><c:if test="${empty feedback}"><p>Chưa có nhận xét.</p></c:if>

@@ -48,7 +48,7 @@ class MysqlIntegrationTest {
     private AuthenticatedUser user(String username, String role) { return new AuthenticatedUser(id(username),username,username,"unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_"+role))); }
 
     @Test void migrationsAndDemoPasswordMatch() {
-        assertEquals(17, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE", Integer.class));
+        assertEquals(20, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE", Integer.class));
         assertTrue(encoder.matches("ChangeMe123!", jdbc.queryForObject("SELECT password_hash FROM users WHERE username='hocsinh'", String.class)));
         assertEquals(8, lessons.findPublishedForStudent(id("hocsinh")).size());
         assertEquals(8L, ((Number)lessons.progressSummary(id("hocsinh")).get("total_lessons")).longValue());

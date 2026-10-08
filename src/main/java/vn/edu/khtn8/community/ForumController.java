@@ -104,7 +104,7 @@ public class ForumController {
         forum.moderate(user, id, request.status());
     }
     private String view(Model model, String view) {
-        model.addAttribute("pageTitle", "Cộng đồng · EduLab");
+        model.addAttribute("pageTitle", "Hỏi đáp học tập · EduLab");
         model.addAttribute("contentPage", "/WEB-INF/jsp/forum/" + view + ".jsp");
         return "layout/default";
     }

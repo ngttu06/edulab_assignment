@@ -1,0 +1,6 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="nav.jspf" %>
+<a href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback">← Nhận xét</a><h1 class="h3 mt-3">${empty item ? 'Thêm nhận xét' : 'Sửa nhận xét'}</h1><p id="workspaceNotice" role="status" aria-live="polite"></p>
+<form data-workspace-form="feedback" data-api="/api/v1/teacher/students/${studentId}/feedback${empty item ? '' : '/'}${item.id}" data-method="${empty item ? 'POST' : 'PUT'}" data-return="/teacher/students/${studentId}/feedback"><label for="feedbackBody" class="form-label">Nội dung nhận xét</label><textarea id="feedbackBody" name="body" class="form-control mb-3" rows="6" maxlength="2000" required><c:out value="${item.body}"/></textarea><button class="btn btn-primary">Lưu nhận xét</button><a class="btn btn-outline-primary" href="${pageContext.request.contextPath}/teacher/students/${studentId}/feedback">Hủy</a></form>
+<script src="${pageContext.request.contextPath}/js/teacher-workspace.js" defer></script>

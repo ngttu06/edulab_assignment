@@ -1,0 +1,7 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="class-nav.jspf" %>
+<h1 class="h3">Phân công giáo viên</h1><p id="workspaceNotice" role="status" aria-live="polite"></p>
+<ul class="list-group mb-4"><c:forEach var="teacher" items="${teachers}"><li class="list-group-item"><c:out value="${teacher.full_name}"/> — <c:out value="${teacher.username}"/> <c:if test="${empty classroom.archived_at}"><button class="btn btn-outline-danger btn-sm" data-delete="/api/v1/admin/classes/${classId}/teachers/${teacher.id}" data-confirm="Gỡ phân công giáo viên? Nội dung và lịch sử học vẫn được giữ.">Gỡ phân công</button></c:if></li></c:forEach></ul>
+<c:if test="${empty classroom.archived_at}"><form data-workspace-form="teacher" data-api="/api/v1/admin/classes/${classId}/teachers" data-method="POST"><label for="teacherId" class="form-label">Giáo viên đang hoạt động</label><select id="teacherId" name="userId" class="form-select mb-3" required><c:forEach var="member" items="${members}"><c:if test="${member.role == 'TEACHER'}"><option value="${member.id}"><c:out value="${member.full_name}"/> — <c:out value="${member.username}"/></option></c:if></c:forEach></select><button class="btn btn-primary">Phân công</button></form></c:if>
+<script src="${pageContext.request.contextPath}/js/teacher-workspace.js" defer></script>

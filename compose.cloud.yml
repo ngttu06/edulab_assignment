@@ -1,4 +1,4 @@
-# MySQL is exclusively mysql.ngttu.com. Local fixtures use compose.local.yml.
+# MySQL is exclusively mysql.ngttu.com; no local database service or fallback.
 name: edulab
 x-cloud-environment: &cloud-environment
   EDULAB_DB_URL: jdbc:mysql://mysql.ngttu.com:3306/edulab_assignment?sslMode=VERIFY_IDENTITY&serverTimezone=UTC&connectTimeout=10000&socketTimeout=30000

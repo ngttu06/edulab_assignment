@@ -1,0 +1,11 @@
+<%@ page pageEncoding="UTF-8" %>
+<%@ include file="nav.jspf" %>
+<div class="teacher-breadcrumb"><a href="${pageContext.request.contextPath}/teacher/classes">Lớp học</a><span aria-hidden="true">/</span><strong><c:out value="${classroom.name}"/></strong><span class="text-muted">· <c:out value="${classroom.academic_year}"/></span></div>
+<nav aria-label="Điều hướng lớp" class="teacher-class-nav mb-4">
+    <a data-nav data-nav-exact href="${pageContext.request.contextPath}/teacher/classes/${classId}">Tổng quan lớp</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/classes/${classId}/students">Học sinh</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/classes/${classId}/assignments">Bài đã giao</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/classes/${classId}/progress">Tiến độ</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/classes/${classId}/results">Kết quả</a>
+</nav>
+<c:if test="${not empty classroom.archived_at}"><p class="alert alert-warning">Lớp đã lưu trữ. Lịch sử được giữ lại; không tiếp nhận hoạt động mới.</p></c:if>

@@ -1,7 +1,7 @@
 spring:
   datasource:
-    url: ${EDULAB_DB_URL:jdbc:mysql://mysql.ngttu.com:3306/edulab_assignment?sslMode=VERIFY_IDENTITY&serverTimezone=UTC&connectTimeout=10000&socketTimeout=30000}
-    username: ${EDULAB_DB_USERNAME:ngttu}
+    url: ${EDULAB_DB_URL}
+    username: ${EDULAB_DB_USERNAME}
     password: ${EDULAB_DB_PASSWORD}
     hikari:
       maximum-pool-size: 5

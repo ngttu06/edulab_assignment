@@ -1,0 +1,13 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" session="false" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ include file="class-nav.jspf" %>
+<h1 class="h3">Học sinh trong lớp</h1>
+<c:if test="${empty classroom.archived_at}"><a class="btn btn-primary mb-3" href="${pageContext.request.contextPath}/teacher/classes/${classId}/students/new">Thêm học sinh</a></c:if>
+<p id="classNotice" role="status" aria-live="polite"></p>
+<form method="get" class="d-flex gap-2 mb-3"><label for="studentSearch" class="visually-hidden">Tìm theo tên hoặc tên đăng nhập</label><input id="studentSearch" name="search" type="search" class="form-control" maxlength="100" value="<c:out value='${roster.search}'/>" placeholder="Tìm học sinh trong lớp"><button class="btn btn-outline-primary flex-shrink-0 text-nowrap">Tìm</button></form>
+<p><c:out value="${roster.total}"/> học sinh phù hợp · Trang ${roster.page + 1}</p>
+<div class="table-responsive" tabindex="0" role="region" aria-label="Danh sách học sinh, cuộn ngang để xem thao tác"><table class="table align-middle text-nowrap"><thead><tr><th>Học sinh</th><th>Tiến độ bài trong lớp</th><th>Trạng thái</th><th>Quản lý</th></tr></thead><tbody>
+<c:forEach var="student" items="${roster.students}"><tr><td><strong><c:out value="${student.full_name}"/></strong><br><small><c:out value="${student.username}"/></small></td><td><c:out value="${student.completion_percent}"/>%</td><td>${student.active ? 'Đang theo học' : 'Đã ngừng tham gia'}</td><td><div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="${pageContext.request.contextPath}/teacher/classes/${classId}/students/${student.id}">Chi tiết</a><c:if test="${empty classroom.archived_at}"><button type="button" class="btn btn-outline-secondary btn-sm" data-membership="${student.id}" data-class="${classId}" data-active="${not student.active}">${student.active ? 'Ngừng tham gia' : 'Khôi phục'}</button></c:if></div></td></tr></c:forEach>
+</tbody></table></div><c:if test="${empty roster.students}"><p>Không có học sinh phù hợp.</p></c:if>
+<nav aria-label="Trang học sinh" class="d-flex gap-3"><c:if test="${roster.page > 0}"><c:url var="prev" value="/teacher/classes/${classId}/students"><c:param name="search" value="${roster.search}"/><c:param name="page" value="${roster.page - 1}"/></c:url><a href="<c:out value='${prev}'/>">← Trang trước</a></c:if><c:if test="${(roster.page + 1) * 25 < roster.total}"><c:url var="next" value="/teacher/classes/${classId}/students"><c:param name="search" value="${roster.search}"/><c:param name="page" value="${roster.page + 1}"/></c:url><a href="<c:out value='${next}'/>">Trang sau →</a></c:if></nav>
+<script src="${pageContext.request.contextPath}/js/teacher-class.js" defer></script>

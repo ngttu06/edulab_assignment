@@ -11,7 +11,9 @@
     <link href="${pageContext.request.contextPath}/css/fonts.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/edulab.css" rel="stylesheet">
     <link href="${pageContext.request.contextPath}/css/ai-chat.css" rel="stylesheet">
+    <link href="${pageContext.request.contextPath}/css/motion.css" rel="stylesheet">
     <script src="${pageContext.request.contextPath}/js/app.js" defer></script>
+    <script src="${pageContext.request.contextPath}/js/motion.js" defer></script>
     <script src="${pageContext.request.contextPath}/js/auth.js" defer></script>
     <script src="${pageContext.request.contextPath}/js/ai-chat.js" defer></script>
 </head>

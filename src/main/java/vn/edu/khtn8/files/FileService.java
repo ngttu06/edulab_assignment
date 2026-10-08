@@ -14,10 +14,12 @@ public class FileService {
     private final JdbcTemplate jdbc;
     private final FileStorage storage;
     private final ForumService forum;
+    private final vn.edu.khtn8.community.SocialCommunityService social;
     private final StorageSettingsService storageSettings;
     private final R2Client r2;
-    public FileService(JdbcTemplate jdbc, FileStorage storage, ForumService forum,StorageSettingsService storageSettings,R2Client r2) {
-        this.jdbc = jdbc; this.storage = storage; this.forum = forum;this.storageSettings=storageSettings;this.r2=r2;
+    public FileService(JdbcTemplate jdbc, FileStorage storage, ForumService forum,StorageSettingsService storageSettings,R2Client r2,
+                       vn.edu.khtn8.community.SocialCommunityService social) {
+        this.jdbc = jdbc; this.storage = storage; this.forum = forum;this.storageSettings=storageSettings;this.r2=r2;this.social=social;
     }
     public record Download(Resource resource, String filename, long length) { }
     public record ImagePreview(Download download, String contentType) { }
@@ -43,7 +45,7 @@ public class FileService {
         var rows = jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND scan_status='CLEAN'", id);
         if (rows.isEmpty()) throw notFound();
         var file = rows.getFirst();
-        if (((Number)file.get("uploaded_by")).longValue() != user.id() && !forum.canDownload(user, id)) throw notFound();
+        if (((Number)file.get("uploaded_by")).longValue() != user.id() && !forum.canDownload(user, id) && !social.canDownload(user,id)) throw notFound();
         long length=((Number)file.get("size_bytes")).longValue();
         Resource resource;
         if(file.get("storage_profile_id")==null) resource=storage.load((String)file.get("storage_key"));

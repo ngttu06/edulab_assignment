@@ -1,0 +1,8 @@
+<%@ page pageEncoding="UTF-8" %>
+<nav aria-label="Không gian giáo viên" class="teacher-nav mb-4">
+    <a data-nav data-nav-exact href="${pageContext.request.contextPath}/teacher">Tổng quan</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/classes">Lớp học</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/lessons">Bài học</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/quizzes">Quiz</a>
+    <a data-nav href="${pageContext.request.contextPath}/teacher/assignments">Bài đã giao</a>
+</nav>

@@ -1,5 +1,12 @@
 # EduLab KHTN 8
 
+**Deployment:** container `edulab` chỉ kết nối MySQL cloud qua TLS;
+bản nguồn này yêu cầu schema V20 (bình luận/cảm xúc). Không còn script/Compose
+MySQL local cho deployment hoặc fallback datasource trong profile remote.
+Hướng dẫn vận hành và hạn chế scanner ảnh tại
+`/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`. Các mục ghi rõ
+ngày cũ ở bên dưới là lịch sử kiểm thử, không phải cấu hình triển khai hiện tại.
+
 Website học tập EduLab, khởi đầu với Khoa học tự nhiên lớp 8 và đã có danh mục đa môn, dùng **Java 21, Spring Boot 3.5.16, Tomcat 10.1, JSP/JSTL, Bootstrap, MySQL 8 và Flyway**, đóng gói WAR. Giao diện tiếng Việt lấy cảm hứng từ bố cục Mapstudy; giữ thương hiệu EduLab, không đưa ảnh giáo viên, quảng cáo hoặc mã Next.js của Mapstudy vào ứng dụng.
 
 Đây là **MVP học tập, chưa phải bản production-ready**. Không dùng dữ liệu cá nhân thật của học sinh để kiểm thử.
@@ -118,18 +125,13 @@ JWT secret phải là Base64 của ít nhất 32 byte ngẫu nhiên; không có 
 
 ### Script phát triển mặc định (không phải môi trường xác nhận 3307)
 
-`$PROJECT_ROOT/run-local.sh` dùng database `localhost:3306/edulab_assignment` và cấu hình trong `$PROJECT_ROOT/compose.local.yml` (chỉ dành cho phát triển, không phải deployment cloud). Script từ chối biến `EDULAB_DB_URL/USERNAME/PASSWORD` đã được export để tránh vô tình dùng DB khác; khởi động MySQL bằng file Compose local chỉ định rõ. `--existing-mysql` bỏ qua Docker nhưng yêu cầu database/user local đã có sẵn. `docker compose up` thông thường dùng cloud, không khởi động DB local.
+Đã bỏ script và Compose MySQL local. `docker compose up` dùng duy nhất MySQL cloud. Chỉ bộ test chạy trên MySQL dùng một lần tại loopback, theo cấu hình riêng ở phần kiểm thử; không dùng nó làm datasource của container deployment.
 
 ```bash
-# Chỉ chạy ở terminal local riêng, không dùng để xác nhận vào DB 3307 ở trên.
-unset EDULAB_DB_URL EDULAB_DB_USERNAME EDULAB_DB_PASSWORD
-export SERVER_ADDRESS=127.0.0.1
-bash "$PROJECT_ROOT/run-local.sh"
-# Hoặc, nếu đã chuẩn bị MySQL theo đúng cấu hình local mặc định:
-# bash "$PROJECT_ROOT/run-local.sh" --existing-mysql
+docker compose up -d --no-build --wait
 ```
 
-URL mặc định của script: `http://127.0.0.1:8080/edulab/`. Không dùng profile local với DB quan trọng, kể cả qua tunnel loopback. `sslMode=DISABLED` và public-key retrieval chỉ dành cho DB loopback phát triển.
+Container bind `127.0.0.1:8088`, context `/edulab`; xem `/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`. Không dùng profile local với DB quan trọng, kể cả qua tunnel loopback. `sslMode=DISABLED` và public-key retrieval chỉ dành cho DB loopback dùng một lần trong kiểm thử.
 
 ### Dữ liệu demo
 
@@ -347,7 +349,7 @@ node --check "$PROJECT_ROOT/scripts/browser-smoke.cjs"
 node --check "$PROJECT_ROOT/scripts/browser-auth.cjs"
 node --check "$PROJECT_ROOT/scripts/browser-profile.cjs"
 find "$PROJECT_ROOT/src/main/resources/static/js" -name '*.js' -exec node --check {} \;
-bash -n "$PROJECT_ROOT/run-local.sh" "$PROJECT_ROOT/run-remote.sh"
+bash -n "$PROJECT_ROOT/run-remote.sh"
 git -C "$PROJECT_ROOT" diff --check
 ```
 

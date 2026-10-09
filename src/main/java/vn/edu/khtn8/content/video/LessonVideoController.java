@@ -31,6 +31,7 @@ public class LessonVideoController {
         model.addAttribute("lessons",videos.manageable(user));
         if (SchoolService.hasRole(user,"ADMIN")) model.addAttribute("teachers",videos.teachers(user));
         model.addAttribute("videoHosts",policy.hosts());
+        model.addAttribute("videoAllHosts",policy.allowsAllHosts());
         model.addAttribute("playerAvailable",policy.playerAvailable());
         model.addAttribute("playerPath",policy.playerPath());
         return page(model,"lesson/video-manage","Quản lý video bài học");

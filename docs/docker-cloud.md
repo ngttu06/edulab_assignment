@@ -36,7 +36,7 @@ Biến cần có:
 | `EDULAB_JWT_SECRET` | Secret mạnh đã cấu hình, giữ riêng từng môi trường |
 | `EDULAB_AI_ENCRYPTION_KEY` | Khóa mã hóa AI **đúng với ciphertext trong DB** |
 | `EDULAB_STORAGE_ENCRYPTION_KEY` | Khóa mã hóa R2 **đúng với ciphertext trong DB** |
-| `EDULAB_VIDEO_ALLOWED_HOSTS` | Domain HTTPS chính xác của HLS manifest/segments/keys nếu dùng m3u8 |
+| `EDULAB_VIDEO_ALLOWED_HOSTS` | Tùy chọn: trống hoặc `*` cho phép mọi domain HTTPS cho HLS/MP4; danh sách domain chính xác phân cách dấu phẩy để giới hạn lại (gồm manifest/segments/keys) |
 | `EDULAB_CLAMAV_HOST` / `EDULAB_CLAMAV_PORT` | ClamAV INSTREAM trên mạng tin cậy nếu dùng upload |
 
 Không sinh lại khóa mã hóa khi triển khai/restart: sẽ không đọc được key AI/R2 đã
@@ -104,7 +104,11 @@ File upload chính vẫn ở R2, video vẫn stream từ YouTube/CDN, không cop
 Trang học và AI dùng lại dữ liệu/cấu hình cloud hiện có. Bản PlayerJS Builder hợp
 lệ phải đặt vào `src/main/resources/static/js/vendor/playerjs.js` **trước build**;
 image không tự tải PlayerJS demo. Xem [hướng dẫn video](lesson-video-learning.md).
-Nếu chưa cài thì YouTube vẫn dùng được, m3u8 báo chưa cài player.
+MP4 và HLS đều dùng PlayerJS chính thức; nếu thiếu bundle thì cả hai báo chưa cài player.
+YouTube vẫn dùng player độc lập. Cài đặt AI có prompt riêng cho bài học/video và hỗ trợ,
+cùng nút lấy model qua Base URL + `/models`; xem [hướng dẫn AI](ai-settings.md).
+Image mới có migration V21 thêm hai cột prompt nullable, cần backup và chạy job migration
+trước app. Không thay khóa AI, provider/model hoặc hạn mức khi migrate.
 Không có ClamAV thì file upload tiếp tục cách ly, không tự bật scan bypass.
 
 ## 4. HTTPS và reverse proxy
@@ -128,6 +132,56 @@ trong shell hoặc file `.env` của Compose, hoặc `--env-file` của Compose;
 cấu hình networking phù hợp thay vì coi localhost container là host.
 Cập nhật CORS R2 cho origin HTTPS chính xác (không có `/edulab`). Image không kèm
 certificate/domain/reverse proxy và không thay thiết lập HTTPS hiện có của host.
+
+### Upload R2 bị CORS ở cổng 8088
+
+Browser gửi raw `PUT` trực tiếp lên R2, nên `Access-Control-Allow-Origin` phải do
+**R2 trả về**. Thêm CORS trong Spring, tăng EventEmitter listeners, dùng `no-cors`
+hay restart container không sửa được preflight ở storage.
+
+1. Trong Cloudflare → R2 → bucket đang cấu hình → Settings → CORS, thêm rule từ
+   `/Users/ngttu/Workspace/project_asm_prj/docker/r2-cors.json`. Cho phép đúng
+   `http://127.0.0.1:8088` và `http://localhost:8088`, method `PUT`, header
+   `Content-Type`. Giữ rule/origin cũ, thêm origin HTTPS thật khi dùng reverse proxy;
+   không dùng `*`, không mở public bucket, không thêm `/edulab` hoặc dấu `/` cuối.
+2. Kiểm tra preflight (không cần URL có chữ ký, không ghi object):
+
+   ```bash
+   curl -i --max-time 15 -X OPTIONS \
+     'https://c9da795e23235545fa54e8c7ee61d3cf.r2.cloudflarestorage.com/edulab/edulab/staging/cors-check' \
+     -H 'Origin: http://127.0.0.1:8088' \
+     -H 'Access-Control-Request-Method: PUT' \
+     -H 'Access-Control-Request-Headers: content-type'
+   ```
+
+   Kỳ vọng HTTP 200/204, `Access-Control-Allow-Origin` đúng origin và method/header
+   được cho phép. `403` không có allow-origin cho thấy cần kiểm tra bucket/rule/origin.
+   Policy có thể cần tới 30 giây để cập nhật; thử lại bằng phiên browser mới.
+3. Cấp **URL mới** rồi upload lại, hoặc dùng nút kiểm tra PUT/CORS trong admin.
+   URL upload hết hạn sau 300 giây; không tái sử dụng URL từ log cũ, không log URL
+   mới vì đây là bearer token. Browser tự đặt `Content-Length` đã ký, JS chỉ đặt
+   `Content-Type`; không gửi app cookie/JWT/CSRF sang R2.
+4. CORS thông không có nghĩa là file đã CLEAN. File diễn đàn/AI thiếu ClamAV vẫn
+   phải cách ly. Riêng ảnh mới qua luồng Cộng đồng được chủ sở hữu yêu cầu bỏ quét
+   antivirus ngày 09/10/2026; xem `/Users/ngttu/Workspace/project_asm_prj/docs/social-community.md`.
+   Không bật scan bypass toàn ứng dụng để thực hiện ngoại lệ này.
+
+Các cảnh báo `contentscript.js`, `ObjectMultiplex`, `app-init-liveness` hoặc
+`background-liveness` không có trong source ứng dụng. Nếu xuất hiện, kiểm tra URL
+script trong DevTools: `chrome-extension://...` thuộc extension (thường là ví
+trình duyệt). Thử profile Chrome sạch/không extension hoặc tắt extension trên site;
+cập nhật extension nếu cần. Không dùng `setMaxListeners()` trong ứng dụng để che
+cảnh báo từ extension.
+
+Kiểm thử XHR không cần DB/mạng:
+
+```bash
+node /Users/ngttu/Workspace/project_asm_prj/src/test/browser/file-upload.cjs
+```
+
+Test kiểm tra upload liên tiếp không tích lũy listener, raw PUT không credentials,
+progress và cleanup khi thành công/lỗi mạng/timeout/hủy/lỗi gửi đồng bộ. Thông báo
+lỗi mạng nêu đúng `window.location.origin` để operator cấu hình R2.
 
 ## 5. Chuyển image sang máy khác, không cần source/Java/Maven
 
@@ -427,3 +481,181 @@ curl -fsS http://127.0.0.1:8088/edulab/actuator/health
 Sau rollback, tiếp tục chỉ định `EDULAB_IMAGE` rollback cho các lệnh Compose;
 `latest` vẫn trỏ release admin mới trừ khi chủ sở hữu chủ động đổi tag. Không dùng
 `down -v`, không xoay secrets hoặc phục hồi database chỉ để rollback ứng dụng.
+
+## Sửa upload CORS và triển khai container — 09/10/2026 (+07)
+
+- Nguyên nhân: rule CORS R2 hiện có chỉ cho cổng 8085, không khớp origin container
+  `http://127.0.0.1:8088`. Preflight trước sửa trả 403, không có allow-origin.
+  Đã thêm rule riêng cho `http://127.0.0.1:8088` và `http://localhost:8088`, chỉ
+  `PUT`/`Content-Type`, giữ rule 8085; không mở public bucket hoặc wildcard.
+- Preflight sau sửa trả 204 và đúng allow-origin. Chrome sạch kiểm tra raw PUT
+  thật trước/sau deploy từ cả hai origin, ký Content-Type/Content-Length như ticket
+  ứng dụng, progress đạt 100%. Probe riêng trong `edulab/probe/` đã HEAD/GET kiểm
+  tra nội dung và DELETE; không tạo file/bài viết/tài khoản thử trong cloud DB.
+- XHR dọn abort listener cùng các callback khi hoàn tất/lỗi/hủy, kể cả `send()`
+  lỗi đồng bộ; thông báo lỗi mạng nêu đúng origin và nơi cấu hình CORS trên R2.
+  Mẫu admin dùng cổng 8088; JSON và hướng dẫn chẩn đoán được lưu trong source.
+- Maven `verify -Dtest=!MysqlIntegrationTest` đạt **237 tests, 0 failures/errors/
+  skipped** trên DB dùng một lần `127.0.0.1:3307/edulab_test`. Bộ Testcontainers
+  3 test được loại có chủ ý, không tính là đã chạy. Lượt đầu thiếu quyền fixture DB;
+  đã chuẩn bị riêng `edulab_test` trong container test, không sửa DB fixture admin.
+  5 test Compose, XHR regression, syntax 26 JS và browser Cộng đồng offline 7
+  viewport đều đạt. `git diff --check` đạt.
+- Image Linux/amd64: `edulab-khtn8:r2-cors-20261008t175233z-6fb9f23a65f0`,
+  đồng thời tag `latest`; ID
+  `sha256:e1951bee06cc396a7a1aeeab777a0300b51cd2993f234b013eceb78c4422da97`.
+  Source release có thay đổi chưa commit; revision là base Git, source hash riêng
+  được ghi trong report. Đối chiếu 136 file resource/JSP trong WAR với source và
+  WAR trong container với image đạt; HTTP `file-upload.js` khớp source.
+- `edulab` healthy, health UP, UID 10001, bind `127.0.0.1:8088`. Job migrate exit 0
+  **chỉ validate V20**. Không đổi `.env.remote`, runtime secrets/khóa, storage volume,
+  cookie Secure, scan bypass hoặc migration approval; không thêm migration/schema.
+  Fingerprint 10 bảng nội dung/lớp học chọn trước/sau khớp, không chứng minh toàn bộ
+  DB bất biến vì scheduled jobs vẫn chạy. Không tạo dump database trong lượt này.
+- Public smoke `/`, `/courses`, `/login` ở 1440/390px đạt không lỗi JS ứng dụng,
+  resource trang hoặc overflow trong lượt kiểm tra lại. Lượt đầu có một console
+  404 đơn lẻ không tái hiện; không che lỗi console hoặc sửa ngoài phạm vi.
+  Không kiểm thử đăng bài ảnh end-to-end bằng tài khoản cloud. ClamAV vẫn chưa
+  cấu hình nên file người dùng tiếp tục cách ly; không bật bypass để làm ảnh đăng được.
+- `contentscript.js`/ObjectMultiplex không thuộc source và không xuất hiện trong
+  smoke ứng dụng bằng Chrome sạch. Cần xem URL extension trong browser gốc để xác
+  nhận extension cụ thể; không thay `setMaxListeners()` trong app.
+- Report, snapshot/env backup riêng tư và lệnh rollback tại
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/r2-cors-20261008T175233Z/`.
+  Không đưa thư mục này hoặc URL probe/secrets vào Git/image.
+
+Rollback chỉ ứng dụng (giữ CORS đã sửa, database và volume):
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:before-r2-cors-20261008t175233z docker compose \
+  --project-directory /Users/ngttu/Workspace/project_asm_prj \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+curl -fsS http://127.0.0.1:8088/edulab/actuator/health
+```
+
+Sau rollback giữ `EDULAB_IMAGE` tương ứng, vì `latest` vẫn trỏ image CORS mới.
+
+## Bỏ antivirus riêng cho ảnh Cộng đồng — 09/10/2026 (+07)
+
+- Theo yêu cầu chủ sở hữu, **ảnh mới qua luồng Cộng đồng không gọi ClamAV**.
+  Không bật `EDULAB_DEV_SCAN_BYPASS`; quét file diễn đàn/AI giữ nguyên. Chi tiết
+  phạm vi và đánh đổi bảo mật ở `/Users/ngttu/Workspace/project_asm_prj/docs/social-community.md`.
+- Ticket riêng `/api/v1/files/community/presign` dùng prefix server sinh
+  `edulab/community/staging/` và `edulab/community/files/`. Giữ authentication,
+  CSRF, quota, presigned Content-Type/Content-Length, copy final và kiểm JPEG
+  ≤500 KiB/1600px/không metadata, hash và quyền sở hữu. Ảnh ghi nhận chưa quét,
+  không gắn nhãn CLEAN giả; chỉ ảnh đã kiểm định từ luồng này được đăng/hiển thị
+  ngay. Scheduler không quét chúng; diễn đàn/AI từ chối tái dùng file prefix này.
+- Không chuyển file cũ sang CLEAN; ảnh upload từ luồng generic trước thay đổi
+  cần chọn/upload lại ở Cộng đồng. R2 lifecycle nếu có cần thêm staging prefix
+  mới, không thêm lifecycle xóa final images. CORS và quyền bucket giữ nguyên.
+- `clean verify -Dtest=!MysqlIntegrationTest` đạt **243 tests, 0 failures/errors/
+  skipped** trên DB dùng một lần. 3 test Testcontainers loại có chủ ý. Test mới
+  kiểm no-scanner/publish/preview, file sai định dạng/size/metadata, file tên giả
+  không bypass, quyền xem ảnh sau ẩn bài và chặn tái dùng qua diễn đàn/AI.
+  Lượt verify đầu phát hiện assertion fixture sai scope biến; đã sửa và chạy
+  clean verify đạt. Browser offline 7 viewport đạt luồng nén/PUT giả lập/complete/
+  publish/hiển thị khi `scanStatus=PENDING_SCAN,communityReady=true`. 5 test Compose,
+  XHR regression, syntax 27 JS và whitespace checks đạt.
+- Image: `edulab-khtn8:community-noscan-20261008t181636z-6fb9f23a65f0`, tag `latest`;
+  ID `sha256:11a0c45bdb640741e571df00183fe9328248d14a708c3a915ed562ca30acdb7e`.
+  Source release gồm thay đổi chưa commit; revision là base Git và report có
+  source hash riêng. 136 file JSP/resources trong WAR khớp source, WAR đang chạy
+  khớp image; `social-community.js` và `file-upload.js` qua HTTP khớp source.
+- Container `edulab` healthy, health UP, port `127.0.0.1:8088`. Job migrate chỉ
+  validate V20, exit 0; không thêm/chạy migration/schema, không thay `.env.remote`,
+  runtime guards/secret/khóa, port hoặc storage volume. Fingerprint 10 bảng
+  nội dung/lớp học chọn trước/sau khớp; không chứng minh toàn DB bất biến.
+- Public browser `/`, `/courses`, `/login` ở 1440/390px không lỗi JS/resource/
+  overflow. POST presign mới và generic chưa đăng nhập vẫn bị từ chối. Không
+  đăng nhập/tạo bài ảnh mẫu trên cloud, nên không tuyên bố image-post cloud E2E
+  đã chạy; tích hợp no-scanner/publish/preview kiểm bằng R2 mock trên DB thử.
+- Report riêng tư và rollback:
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/community-noscan-20261008T181636Z/`.
+  Image trước được giữ. Rollback không hạ schema/khôi phục DB hoặc xóa volume.
+  Sau rollback ảnh prefix Cộng đồng mới chưa CLEAN sẽ không hiển thị ở bản cũ;
+  không tự sửa dữ liệu hoặc quét status để tránh che việc chưa quét.
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:before-community-noscan-20261008t181636z docker compose \
+  --project-directory /Users/ngttu/Workspace/project_asm_prj \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+curl -fsS http://127.0.0.1:8088/edulab/actuator/health
+```
+
+Giữ `EDULAB_IMAGE` rollback nếu dùng bản cũ; `latest` vẫn trỏ bản community-noscan.
+
+## Sửa JPEG canvas upload Cộng đồng — 09/10/2026 (+07)
+
+- Tái hiện lỗi: JPEG từ Chrome canvas thêm ICC color profile APP2, bị policy
+  metadata-free backend từ chối và trả thông báo chung về upload hết hạn/hủy/file
+  sai định dạng. Client nay loại APP metadata/comment, chỉ giữ JFIF và dữ liệu
+  JPEG trước presign/PUT; không nới lỏng backend, không bật scan bypass.
+- Sửa encoder cho ảnh nhỏ dưới 320 px; không phóng lớn. Composer không còn dòng
+  “Tối đa 5 ảnh · Tự động nén và kiểm tra định dạng · Không quét antivirus”, nhãn
+  dung lượng hoặc thông báo nén. Giữ preview/progress, chặn gửi lặp khi đang xử lý,
+  giữ draft/ảnh khi lỗi và xin ticket mới khi thử lại. Backend phân biệt thông báo
+  EXPIRED/CANCELLED/REJECTED, không gộp các nguyên nhân khác nhau.
+- Maven `verify -Dedulab.test.browserUploads=true -Dtest=!MysqlIntegrationTest`
+  đạt **246 tests, 0 failures/errors/skipped** trên MySQL dùng một lần
+  `127.0.0.1:3307/edulab_test_admin`. 3 test Testcontainers loại có chủ ý.
+  Browser offline 7 viewport, XHR regression và 5 test Compose đạt. Bốn JPEG thật
+  từ browser (ảnh lớn, PNG/JPEG/WebP nhỏ) qua backend policy và complete → đăng
+  bài → preview trên MySQL test với R2 mock đạt; transaction rollback. Metadata
+  ICC/EXIF giả vẫn bị backend từ chối. Không gọi AI hoặc thay cấu hình R2 cloud.
+- Image Linux/amd64 `edulab-khtn8:community-upload-20261008t183434z`, tag `latest`;
+  ID `sha256:25041b0f756b5ec9b5a0f8c729b32e99d046a305fa19040c854603c849941af4`.
+  Image/WAR đối chiếu source manifest; WAR đang chạy khớp image, HTTP JS khớp
+  source. Container `edulab` Docker healthy, health UP, port `127.0.0.1:8088`.
+- Job migrate chỉ validate V20; không áp dụng migration. Giữ nguyên `.env.remote`,
+  secrets/khóa mã hóa, runtime guards false, volume/mount/port/security options.
+  Fingerprint các bảng nội dung/lớp học đã chọn trước/sau khớp; không chứng minh
+  toàn DB bất biến. Public browser desktop/mobile không lỗi JS/tràn ngang;
+  presign generic/Cộng đồng chưa đăng nhập bị từ chối.
+- **Không đăng bài/upload ảnh bằng tài khoản cloud trong lượt này.** Xác nhận
+  nghiệp vụ bằng browser bytes + MySQL test/R2 mock không thay thế cloud E2E.
+  Report riêng tư và rollback image:
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/community-upload-20261008T183434Z/`.
+
+Rollback chỉ ứng dụng, không hạ schema/phục hồi DB/xóa volume:
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:before-upload-20261008t183434z docker compose \
+  --project-directory /Users/ngttu/Workspace/project_asm_prj \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+curl -fsS http://127.0.0.1:8088/edulab/actuator/health
+```
+
+Sau rollback giữ `EDULAB_IMAGE` cụ thể; `latest` vẫn trỏ bản đã sửa upload.
+
+## Cập nhật sticky tiện ích + khung xem ảnh/bài viết ngày 09/10/2026 (+07)
+
+- Container `edulab` dùng image `edulab-khtn8:community-viewer-20261008t185619z`.
+  Cột tiện ích giữ vị trí khi cuộn desktop; bấm bài có ảnh mở dialog với ảnh lớn,
+  thông tin bài và bình luận, giữ draft/cảm xúc/cursor khi đóng. Mobile xếp dọc.
+- Maven verify: **246 tests, 0 failures/errors/skips** trên MySQL dùng một lần;
+  `MysqlIntegrationTest` (3 Testcontainers tests) bị loại có chủ đích. Browser mock:
+  7 viewport, sidebar 1280/1440 px, popup 320/390/768/1440 px; chuyển ảnh, focus/Esc,
+  comment CRUD/phân trang/retry, cảm xúc, giữ draft/scroll và xóa bài đều PASS.
+  XHR upload regression và 5 kiểm tra Compose/Docker PASS.
+- Docker healthy, health API UP, WAR và các CSS/JS được phục vụ khớp source.
+  Giữ nguyên schema V20, `.env.remote`, khóa/R2, mount, port và security options.
+  Job migrate chỉ validate. Smoke browser live kiểm tra trang public và redirect
+  Cộng đồng → Đăng nhập; **chưa kiểm thử tương tác tài khoản thật hoặc PUT R2 thật**.
+- Báo cáo riêng ở `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/community-viewer-20261008T185619Z/`;
+  pointer `/Users/ngttu/Workspace/project_asm_prj/.tools/community-viewer-deployment-last`.
+
+Rollback chỉ ứng dụng, không rollback schema và không xóa volume:
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:before-viewer-20261008t185619z docker compose \
+  --project-directory /Users/ngttu/Workspace/project_asm_prj \
+  -f /Users/ngttu/Workspace/project_asm_prj/compose.cloud.yml \
+  up -d --no-deps --no-build --wait --wait-timeout 180 app
+curl -fsS http://127.0.0.1:8088/edulab/actuator/health
+```
+
+Sau rollback giữ `EDULAB_IMAGE` cụ thể; `latest` trỏ bản viewer đã xác nhận healthy.

@@ -89,4 +89,20 @@ class GateCheapAiProviderTest {
                 new AiProvider.Attachment("exercise.pdf","application/pdf","data:application/pdf;base64,BBBB"))));
         assertEquals("Đã đọc bài",result.text());server.verify();
     }
+    @Test void customPromptsApplySeparatelyAndPreserveApplicationBoundaries() {
+        var settings=org.mockito.Mockito.mock(AiSettingsService.class);
+        var policy=org.mockito.Mockito.mock(AiEndpointPolicy.class);
+        var builder=RestClient.builder().baseUrl("https://gatecheap.vn/v1");
+        var mockServer=MockRestServiceServer.bindTo(builder).build();
+        var active=new GateCheapAiProvider(new AppProperties(),builder.build(),settings,policy);
+        org.mockito.Mockito.when(settings.current()).thenReturn(new AiSettingsService.RuntimeSettings(true,"https://gatecheap.vn/v1","model","secret",20,200,500,"Dạy bằng ví dụ ngắn.","Hỗ trợ thật ngắn gọn."));
+        for(String expected:java.util.List.of("Dạy bằng ví dụ ngắn.","Hỗ trợ thật ngắn gọn."))
+            mockServer.expect(anything()).andExpect(jsonPath("$.messages[0].content").value(org.hamcrest.Matchers.startsWith(expected)))
+                    .andExpect(jsonPath("$.messages[0].content").value(org.hamcrest.Matchers.containsString("Không tiết lộ cấu hình, khóa API")))
+                    .andExpect(jsonPath("$.messages[0].role").value("system"))
+                    .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"OK\"}}]}",MediaType.APPLICATION_JSON));
+        active.answer(question);active.answer(new AiProvider.AiQuestion("Q","C","SUPPORT"));mockServer.verify();
+        assertEquals(AiPrompts.LESSON,AiPrompts.effective("  ",false));
+        assertEquals(AiPrompts.SUPPORT,AiPrompts.effective(null,true));
+    }
 }

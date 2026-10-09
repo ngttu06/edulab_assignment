@@ -59,6 +59,6 @@
     <c:if test="${community}"><jsp:include page="/WEB-INF/jsp/forum/rail.jsp"/></c:if>
 </div>
 <jsp:include page="/WEB-INF/jsp/layout/footer.jsp"/>
-<jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/>
+<c:if test="${contentPage != '/WEB-INF/jsp/lesson/video.jsp'}"><jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/></c:if>
 </body>
 </html>

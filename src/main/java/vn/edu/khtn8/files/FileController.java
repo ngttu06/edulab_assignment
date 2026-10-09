@@ -29,6 +29,11 @@ public class FileController {
     }
     @PostMapping("/uploads/{id}/complete")
     public DirectUploadService.Status complete(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String id) { return uploads.complete(user,id); }
+    @PostMapping("/community/presign")
+    public DirectUploadService.Ticket presignCommunity(@AuthenticationPrincipal AuthenticatedUser user,@jakarta.validation.Valid @RequestBody DirectUploadService.Input input,
+            jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader(HttpHeaders.CACHE_CONTROL,"no-store");return uploads.presignCommunity(user,input);
+    }
     @GetMapping("/uploads/{id}/status")
     public DirectUploadService.Status status(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String id,
             jakarta.servlet.http.HttpServletResponse response) {

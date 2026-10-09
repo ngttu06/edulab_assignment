@@ -24,6 +24,7 @@ public class AiAttachmentService {
             var files=jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND uploaded_by=?",id,user.id());
             if(files.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Không tìm thấy file của tài khoản.");
             var file=files.getFirst();
+            if(CommunityImagePolicy.communityKey((String)file.get("storage_key"))) throw StorageSettingsService.bad("Ảnh Cộng đồng không quét antivirus; hãy upload lại qua luồng đính kèm AI.");
             if(!"CLEAN".equals(file.get("scan_status"))) throw new ResponseStatusException(HttpStatus.CONFLICT,"File chưa quét đạt yêu cầu. Chờ quét xong rồi gửi AI lại.");
             String mime=(String)file.get("content_type");boolean pdf=mime.equals("application/pdf");
             if(pdf?!limits.aiPdfEnabled():!limits.aiImagesEnabled()) throw StorageSettingsService.bad(pdf?"Admin chưa bật khả năng đọc PDF của model. Upload vẫn được lưu; hãy gửi ảnh hoặc hỏi giáo viên.":"Admin chưa bật khả năng đọc ảnh của model AI.");

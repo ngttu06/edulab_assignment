@@ -18,13 +18,14 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers=SupportAiController.class,properties="edulab.security.jwt.secret=dGVzdC1vbmx5LW5vdC1mb3ItZGVwbG95bWVudC1zZWNyZXQta2V5LTMyeA==")
+@WebMvcTest(controllers={SupportAiController.class,AiModelController.class},properties="edulab.security.jwt.secret=dGVzdC1vbmx5LW5vdC1mb3ItZGVwbG95bWVudC1zZWNyZXQta2V5LTMyeA==")
 @Import({SecurityConfig.class,AppConfig.class,JwtAuthenticationFilter.class,WebAuthenticationEntryPoint.class})
 class SupportAiSecurityTest {
     @Autowired MockMvc mvc;
     @MockBean SupportAiService service;
     @MockBean AiSettingsService settings;
     @MockBean AiProvider provider;
+    @MockBean AiModelService models;
     @MockBean SupportAiQuota quota;
     @MockBean DatabaseUserDetailsService users;
     @MockBean JwtService jwt;
@@ -53,6 +54,7 @@ class SupportAiSecurityTest {
             mvc.perform(get("/api/v1/admin/ai-settings").with(user(actor(role)))).andExpect(status().isForbidden());
             mvc.perform(put("/api/v1/admin/ai-settings").with(user(actor(role))).with(csrf())).andExpect(status().isForbidden());
             mvc.perform(post("/api/v1/admin/ai-settings/test").with(user(actor(role))).with(csrf())).andExpect(status().isForbidden());
+            mvc.perform(post("/api/v1/admin/ai-settings/models").with(user(actor(role))).with(csrf())).andExpect(status().isForbidden());
         }
         when(settings.view(any())).thenReturn(new AiSettingsService.View(true,"https://gatecheap.vn/v1","gpt-6.1-sol",true,true,20,200,1000));
         mvc.perform(get("/api/v1/admin/ai-settings").with(user(actor("ADMIN"))))
@@ -60,5 +62,27 @@ class SupportAiSecurityTest {
                 .andExpect(jsonPath("$.apiKey").doesNotExist()).andExpect(jsonPath("$.encryptedApiKey").doesNotExist());
         mvc.perform(put("/api/v1/admin/ai-settings").with(user(actor("ADMIN")))).andExpect(status().isForbidden());
         verify(settings,never()).save(any(),any());verifyNoInteractions(provider,quota);
+    }
+    @Test void modelDiscoveryRequiresAdminCsrfAndValidInput() throws Exception {
+        String body="{\"baseUrl\":\"https://gatecheap.vn/v1\",\"apiKey\":\"\"}";
+        mvc.perform(post("/api/v1/admin/ai-settings/models").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/admin/ai-settings/models").with(user(actor("ADMIN"))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/admin/ai-settings/models").with(user(actor("ADMIN"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"baseUrl\":\"\"}")).andExpect(status().isBadRequest());
+        when(models.fetch(any(),any())).thenReturn(new AiModelService.Models(List.of("model-1","model-2")));
+        mvc.perform(post("/api/v1/admin/ai-settings/models").with(user(actor("ADMIN"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.models[0]").value("model-1"))
+                .andExpect(header().string("Cache-Control","private, no-store")).andExpect(jsonPath("$.apiKey").doesNotExist());
+        verify(models,times(1)).fetch(any(),any());
+    }
+    @Test void promptValidationRejectsOversizeAndAdminCanSavePromptsWithoutReturningKey() throws Exception {
+        String prefix="{\"enabled\":false,\"baseUrl\":\"https://gatecheap.vn/v1\",\"model\":\"model\",\"apiKey\":\"\",\"dailyLimit\":20,\"globalDailyLimit\":200,\"maxOutputTokens\":1000,";
+        mvc.perform(put("/api/v1/admin/ai-settings").with(user(actor("ADMIN"))).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(prefix+"\"systemPrompt\":\""+"x".repeat(8001)+"\"}")).andExpect(status().isBadRequest());
+        when(settings.save(any(),any())).thenReturn(new AiSettingsService.View(false,"https://gatecheap.vn/v1","model",true,true,20,200,1000,"Lesson prompt","Support prompt"));
+        mvc.perform(put("/api/v1/admin/ai-settings").with(user(actor("ADMIN"))).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content(prefix+"\"systemPrompt\":\"Lesson prompt\",\"supportSystemPrompt\":\"Support prompt\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.systemPrompt").value("Lesson prompt"))
+                .andExpect(jsonPath("$.supportSystemPrompt").value("Support prompt")).andExpect(jsonPath("$.apiKey").doesNotExist());
+        verify(settings,times(1)).save(any(),any());
     }
 }

@@ -31,7 +31,18 @@ tên **`edulab`**, nạp mật khẩu/JWT/khóa mã hóa hiện có từ `.env.r
 container database hoặc fallback sang DB local. Image đã có sẵn trong workspace;
 đổi `--no-build` thành `--build` nếu source thay đổi hoặc máy chưa có image.
 Cổng mặc định `127.0.0.1:8088`, context `/edulab`; đăng nhập cần HTTPS vì cookie Secure.
-PlayerJS/HLS vẫn cần build hợp lệ của chủ website, không có player giả trong image.
+PlayerJS/HLS có bundle chính thức 22.0.7 từ plugin PlayerJS 2.25, đóng gói nguyên
+bản trong image; không có player giả/crack. Xem nguồn tải/checksum/CSP giới hạn ở
+`src/main/resources/static/js/vendor/PLAYERJS-INSTALL.md`.
+
+**Sửa upload ảnh Cộng đồng — 09/10/2026 (+07):** đã loại ICC/APP2 mà Chrome
+thêm vào JPEG canvas trước upload (backend vẫn kiểm metadata nghiêm ngặt), xử lý
+được ảnh nhỏ dưới 320 px và ẩn thông tin nén/hướng dẫn kỹ thuật khỏi composer.
+Container `edulab` dùng `edulab-khtn8:community-upload-20261008t183434z`, đồng thời
+tag `latest`, health UP/healthy; không đổi schema V20, secrets hoặc volume.
+246 test backend/MySQL đạt, browser offline 7 viewport và JPEG thật từ browser
+qua complete/đăng bài/preview trên MySQL test với R2 mock đều đạt. Chưa chạy đăng
+ảnh bằng tài khoản cloud; chi tiết release/rollback trong hướng dẫn Docker cloud.
 
 **Cập nhật admin — 09/10/2026 (+07):** container `edulab` đã chạy image admin mới
 trên schema cloud V20, health `UP`/Docker `healthy`; giữ nguyên `.env.remote` và
@@ -56,7 +67,7 @@ lại stack. Đổi biến môi trường thì dùng `docker compose up` thay v�
 - **Bảo vệ request:** CSRF cho thao tác thay đổi dữ liệu, kể cả login/register/refresh; lấy token qua `/api/v1/auth/csrf`. Token đăng nhập không trả trong JSON hoặc lưu trong browser storage. Có giới hạn đăng nhập trong bộ nhớ của từng instance.
 - **Bài học và lộ trình:** bài đã xuất bản, HTML được lọc, mục tiêu học tập, tiến độ riêng và dashboard lấy dữ liệu thật. Bài tiên quyết có thể yêu cầu hoàn thành và đạt điểm quiz tối thiểu; kiểm tra quyền mở bài ở server. Admin tạo và xuất bản bài học, câu hỏi trắc nghiệm, quiz.
 - **Học qua video:** thư viện có nút học video theo bài; `/lessons/{id}/video` dùng YouTube IFrame API hoặc PlayerJS miễn phí với m3u8. `/teacher/videos` quản lý một video chính mỗi bài; admin phân công giáo viên theo bài, kiểm tra quyền ở server. Timeline tùy biến trong khung player tô các khoảng đã xem rời rạc, không tô đoạn tua bỏ qua; hỗ trợ tua bằng bàn phím/chạm và fullscreen của khung. YouTube giữ controls chính thức và thêm timeline bên dưới, không can thiệp iframe.
-  - [Hướng dẫn video, API và giới hạn](docs/lesson-video-learning.md). Cần cài build PlayerJS miễn phí của website ở `src/main/resources/static/js/vendor/playerjs.js` và allowlist domain HLS trước khi phát m3u8. Mặc định hoàn thành ở 95%, giáo viên chỉnh được 80–100%. Lưu các khoảng đã xem + resume theo phiên bản, không cộng trùng; đồng bộ mỗi 10 giây/pause/seek. Thay/gỡ video bắt đầu lại tiến độ bài và giữ lịch sử video cũ; bài có video không cho đánh dấu hoàn thành thủ công.
+  - [Hướng dẫn video, API và giới hạn](docs/lesson-video-learning.md). Bundle PlayerJS chính thức đã cài ở `src/main/resources/static/js/vendor/playerjs.js`; build lại WAR/image để dùng. MP4 và HLS đều dùng PlayerJS, YouTube dùng player độc lập. Domain video mặc định nhận HTTPS hợp lệ hoặc giới hạn bằng allowlist. Mặc định hoàn thành ở 95%, giáo viên chỉnh được 80–100%. Lưu các khoảng đã xem + resume theo phiên bản, không cộng trùng; đồng bộ mỗi 10 giây/pause/seek. Thay/gỡ video bắt đầu lại tiến độ bài và giữ lịch sử video cũ; bài có video không cho đánh dấu hoàn thành thủ công.
 - **Quiz:** PRACTICE và TEST; snapshot câu hỏi/đáp án khi bắt đầu, giới hạn lượt, tiếp tục bài đang làm, tự lưu và khôi phục câu trả lời. Server chấm điểm có trọng số trên thang 10. Khi hết giờ, chỉ chấm câu trả lời đã lưu; không nhận đáp án mới từ request nộp muộn. Nộp lại trả kết quả đã lưu. PRACTICE công bố đáp án sau chấm; TEST còn phải chờ lịch công bố. Có tác vụ hoàn tất bài hết giờ.
 - **Lớp học:** giáo viên xem lớp được phân công, giao quiz đã xuất bản với hạn nộp, xem kết quả và nhận xét học sinh. Học sinh và phụ huynh đã liên kết xem bài được giao và nhận xét. Bài được tính hoàn thành khi có lượt chấm nộp trong khoảng từ lúc giao đến hạn nộp; kết quả trước lúc giao không được tính. Admin quản lý lớp, ghi danh và phân công giáo viên.
 - **Gia đình:** mã liên kết ngẫu nhiên 128-bit, lưu hash, dùng một lần, hết hạn sau 15 phút. Học sinh/phụ huynh có thể thu hồi liên kết; kiểm tra phạm vi truy cập báo cáo ở server.
@@ -178,6 +189,8 @@ Spring Boot **không tự đọc `.env`**. `$PROJECT_ROOT/.env.example` và `$PR
 
 Tệp upload trực tiếp R2 được kiểm tra metadata, dung lượng thực tế và chữ ký định dạng, rồi quét qua ClamAV INSTREAM nếu operator đã cấu hình. Chưa có ClamAV hoặc scanner lỗi: **PENDING_SCAN**, không tải xuống/gửi AI. Tác vụ thử quét lại mỗi 30 giây; không có API cho client tự đánh dấu CLEAN. Signature và antivirus không chứng minh file hoàn toàn an toàn. Không bật scan bypass để phục vụ người dùng thật. File local cũ vẫn được đọc từ thư mục ngoài webroot; chưa có UI xóa file đã xác nhận hoặc tự dọn file đã xác nhận nhưng không gắn vào câu hỏi.
 
+**Ngoại lệ Cộng đồng từ 09/10/2026:** theo yêu cầu chủ sở hữu, ảnh upload qua `/api/v1/files/community/presign` không gọi ClamAV và đăng ngay sau kiểm tra JPEG tối ưu (≤500 KiB, ≤1600 px, không metadata), hash và quyền sở hữu. Prefix storage riêng chặn tái sử dụng trong diễn đàn/AI; file không bị đánh dấu giả là CLEAN. Không bật bypass toàn ứng dụng hoặc tự chuyển file cũ sang CLEAN. Đây là bỏ kiểm tra antivirus riêng cho ảnh Cộng đồng, không phải bảo đảm ảnh không có mã độc. Chi tiết: `/Users/ngttu/Workspace/project_asm_prj/docs/social-community.md`.
+
 ### Upload trực tiếp S3 / Cloudflare R2 — 05/10/2026
 
 - `/admin` → **Lưu trữ S3 / Cloudflare R2**: bật/tắt upload, endpoint HTTPS, bucket, region, prefix, thay cả hai khóa, giới hạn ảnh/PDF/tài khoản và khả năng ảnh/PDF của AI. Mặc định endpoint R2 của tài khoản đã cung cấp, bucket `edulab`, region `auto`, prefix `edulab`; migration không chứa credentials. `EDULAB_STORAGE_ALLOWED_HOSTS` do operator quản lý, không phải admin tùy ý thêm host. CSP `connect-src` dùng đúng các host trong allowlist.
@@ -191,12 +204,12 @@ Tệp upload trực tiếp R2 được kiểm tra metadata, dung lượng thực
 - AI chỉ nhận file chính chủ, CLEAN, hash khớp, tối đa 3 file và tổng 15 MiB; ảnh dùng OpenAI `image_url` data URL, PDF dùng `file_data` data URL (không chỉ đưa tên/URL). **Đường truyền upload không qua app**; sau upload app vẫn đọc file từ R2 để scan, download và truyền dữ liệu đã kiểm tra tới AI. Model capability phải bật riêng sau kiểm thử; không suy ra từ HTTP 200 hoặc nhãn OpenAI-compatible. Không có PDF OCR/trích xuất fallback và không có thư viện parser PDF mới. Nếu PDF không được model đọc thì upload/lưu/diễn đàn vẫn dùng được, giải bài PDF bị từ chối rõ ràng.
 - Giới hạn còn lại: không có global upload budget/rate limit phân tán cho toàn hệ thống, không có UI quản lý/xóa file đã hoàn tất, không bảo đảm phát hiện mọi malware/polyglot/prompt injection; R2 client được giới hạn các thao tác cần thiết và timeout, không retry/redirect. Cần egress firewall/DNS đáng tin ở production. Bật AI nghĩa là file học sinh được gửi bên thứ ba; cần chính sách quyền riêng tư phù hợp trẻ em.
 
-**CORS local hiện tại** (bucket vẫn private; origin không có `/edulab`):
+**CORS local** (bucket vẫn private; origin không có `/edulab`; container dùng cổng 8088, app thử cũ dùng 8085):
 
 ```json
 [
   {
-    "AllowedOrigins": ["http://127.0.0.1:8085", "http://localhost:8085"],
+    "AllowedOrigins": ["http://127.0.0.1:8088", "http://localhost:8088", "http://127.0.0.1:8085", "http://localhost:8085"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["Content-Type"],
     "MaxAgeSeconds": 3600
@@ -205,6 +218,8 @@ Tệp upload trực tiếp R2 được kiểm tra metadata, dung lượng thực
 ```
 
 Cấu hình tại Cloudflare → R2 → `edulab` → Settings → CORS. Đổi cổng/origin thì cập nhật rule; CORS không thay thế authorization và không chặn client ngoài browser. Không cần public bucket hoặc Cloudflare control-plane API Token trong app. Nút kiểm tra storage gửi Blob `OK` trực tiếp từ browser, server HEAD/GET/DELETE đúng object probe riêng; probe lỗi/bỏ dở cần lifecycle dọn riêng.
+
+Mẫu riêng cho container ở `/Users/ngttu/Workspace/project_asm_prj/docker/r2-cors.json`; khi áp dụng hãy giữ các rule/origin đang dùng và thêm đúng origin HTTPS nếu chạy qua proxy. `http://localhost:8088` khác `http://127.0.0.1:8088`. CORS nằm trên **bucket R2**, không phải Spring hay Docker: build/restart container không tự cập nhật policy. Hướng dẫn kiểm tra preflight và phân biệt cảnh báo extension ở `/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`.
 
 **Đã xác nhận live:** presigned PUT browser + CORS, HEAD/GET/CopyObject/DeleteObject trên bucket `edulab`; thay Content-Length ký bị R2 trả 403. End-to-end ảnh tự tạo `7 + 5` upload browser → final copy → fixture INSTREAM chỉ chấp nhận hash mẫu → AI model `gpt-6.1-sol` trả `12`; fixture scanner không phải antivirus và đã gỡ sau kiểm thử, scan bypass luôn tắt. Khả năng ảnh bật cho local đã kiểm chứng. PDF mẫu trả HTTP 200 nhưng không xác nhận đọc đúng phép tính, nên **PDF capability vẫn tắt**. Máy local chưa có ClamAV thật: file người dùng tiếp tục cách ly; không tuyên bố quét malware production đã đạt. Khóa dùng cho local lưu mã hóa DB; khóa mã hóa trong `/Users/ngttu/Workspace/project_asm_prj/.tools/ai-preview.env` bị Git ignore. Lần triển khai R2 ban đầu không đổi DB remote; lần chuyển cloud theo yêu cầu riêng ngày 05/10 đã sao chép ciphertext và bổ sung đúng khóa mã hóa vào `.env.remote` riêng tư, xem mục chuyển database cloud.
 
@@ -229,7 +244,7 @@ Khi bật GateCheap, **câu hỏi, tối đa 8 tin nhắn gần nhất và ngữ
 - Nút **Hỏi AI** ở góc dưới phải trong cả layout học tập và đăng nhập/đăng ký. Native dialog hỗ trợ focus, Tab/Escape, đóng/mở, câu hỏi gợi ý, lịch sử giới hạn trong bộ nhớ trang, trạng thái đang chờ/lỗi và cuộc trò chuyện mới. Không lưu chat vào localStorage/sessionStorage hoặc DB; tải lại trang sẽ bắt đầu lại.
 - Khách chưa đăng nhập dùng được `GET /api/v1/ai/support/status` và `POST /api/v1/ai/support/chat`; POST vẫn yêu cầu CSRF. Các endpoint AI bài học còn lại vẫn yêu cầu đăng nhập.
 - Trợ lý hỗ trợ chức năng website, tư vấn khóa có trong DB và tạo nút tới danh mục/chi tiết khóa. Chỉ lấy các cột công khai, không lấy progress/hồ sơ/nội dung nháp. Website **chưa có giá, đơn hàng hay thanh toán**; trợ lý không tự mua hoặc cấp quyền. Không dựa vào AI để đưa ra quyết định thanh toán.
-- `/admin` → **Cấu hình trợ lý AI**: bật/tắt, Base URL, model, API key mới/xóa khóa, hạn mức/người và tổng/ngày, output tokens, nút kiểm tra kết nối đã lưu (một request thật có thể phát sinh phí). Các thay đổi áp dụng ngay cho yêu cầu tiếp theo, bao gồm trợ giảng trong bài học.
+- `/admin/settings/ai` → **Cấu hình AI**: bật/tắt, Base URL, model, API key mới/xóa khóa, hạn mức/người và tổng/ngày, output tokens, nút kiểm tra kết nối đã lưu (một request thật có thể phát sinh phí). Chỉnh system prompt riêng cho trợ giảng bài học/video và hỗ trợ website; để trống để reset mặc định. Nút **Lấy model từ provider** gọi `GET /v1/models` qua backend với khóa đã lưu/khóa mới; vẫn nhập model thủ công được. Chọn model và bấm Lưu để áp dụng cho yêu cầu tiếp theo. Xem [hướng dẫn cấu hình AI](docs/ai-settings.md).
 - Flyway **V13** thêm `ai_settings` (mặc định tắt, host `https://gatecheap.vn/v1`, model `gpt-6.1-sol`) và `support_ai_requests`. Không sửa các migration cũ. Remote/prod cần migrate có duyệt trước khi deploy, không tự chạy startup migration.
 - API key chỉ lưu AES-256-GCM; GET admin chỉ trả `keyConfigured`, không trả key/ciphertext. Audit chỉ ghi người/thao tác, không ghi payload. Đổi host khi còn khóa cần khóa mới hoặc xóa khóa cũ. Host phải HTTPS, không credentials/query/fragment, nằm trong allowlist và không phân giải về mạng nội bộ. Không dùng allowlist cho host không đáng tin; triển khai thật cần thêm egress firewall/DNS an toàn.
 - Sinh khóa mã hóa riêng bằng `openssl rand -base64 32`, export `EDULAB_AI_ENCRYPTION_KEY` ở service manager/shell rồi khởi động. Không sinh lại mỗi restart; mất/đổi khóa sẽ không đọc được API key cũ, cần nhập lại từ admin. **Không commit khóa**. Các biến legacy `EDULAB_AI_ENABLED/BASE_URL/API_KEY/MODEL/MAX_OUTPUT_TOKENS/DAILY_REQUEST_LIMIT` không còn điều khiển runtime; phải cấu hình qua admin.

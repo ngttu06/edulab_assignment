@@ -4,11 +4,11 @@
     if (!form) return;
     const lesson = document.getElementById('videoLesson'), notice = document.getElementById('videoManageNotice');
     const provider = document.getElementById('videoProvider'), url = document.getElementById('videoUrl');
-    let preview, previewTimer, generation = 0;
+    let preview, previewTimer, previewTimeout, generation = 0;
     const scope = document.body.classList.contains('admin-body') ? 'admin' : 'teacher';
     const endpoint = () => '/api/v1/'+scope+'/lessons/'+lesson.value+'/video';
     function stopPreview() {
-        generation++; clearInterval(previewTimer); preview?.destroy(); preview=null;
+        generation++; clearInterval(previewTimer); clearTimeout(previewTimeout); preview?.destroy(); preview=null;
         const holder = document.getElementById('videoPreview'); holder.replaceChildren();
         const container = document.createElement('div'); container.id='previewPlayer'; holder.append(container);
     }
@@ -52,11 +52,15 @@
         try {
             if (!lesson.value) throw new Error('Hãy chọn bài học trước.');
             const source=await window.edulab.api('/api/v1/'+scope+'/videos/validate',{method:'POST',body:{provider:provider.value,sourceUrl:url.value.trim(),durationSeconds:1,completionThreshold:95}});
+            if (ticket !== generation) return;
             text.textContent='Đang tải video xem thử…';
             const nextPreview=await window.edulabVideoPlayer.create({id:'previewPlayer',provider:provider.value,
                 sourceUrl:source.url,youtubeId:source.youtubeId,
                 playerPath:form.dataset.playerPath,playerAvailable:form.dataset.playerAvailable==='true'},
-                {error:error => { text.textContent=error.message; }});
+                {error:error => {
+                    if (ticket !== generation) return;
+                    clearInterval(previewTimer); clearTimeout(previewTimeout); text.textContent=error.message;
+                }});
             if (ticket !== generation) { nextPreview.destroy(); return; }
             preview=nextPreview;
             previewTimer=setInterval(() => {
@@ -64,9 +68,13 @@
                 if (Number.isFinite(duration) && duration>0) {
                     document.getElementById('videoDuration').value=String(Math.round(duration));
                     text.textContent='Thời lượng: '+Math.round(duration)+' giây. Đã điền thời lượng; xem thử không lưu tiến độ.';
-                    clearInterval(previewTimer);
+                    clearInterval(previewTimer); clearTimeout(previewTimeout);
                 }
             },500);
-        } catch(error) { text.textContent=error.message; }
+            previewTimeout=setTimeout(() => {
+                clearInterval(previewTimer);
+                if (ticket === generation) text.textContent='Không tải được thời lượng video. Kiểm tra nguồn HTTPS, CORS, manifest/segment HLS và CSP rồi thử lại.';
+            },25000);
+        } catch(error) { if (ticket === generation) text.textContent=error.message; }
     });
 })();

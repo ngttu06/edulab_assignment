@@ -74,8 +74,15 @@ class AiSettingsMysqlTest {
         settings.save(admin,new AiSettingsService.Input(true,saved.baseUrl(),"other-model","",false,8,80,600));
         assertEquals("test-only-private-secret",settings.current().apiKey);assertEquals("other-model",settings.current().model);
         assertEquals(8,settings.dailyLimit());
+        settings.save(admin,new AiSettingsService.Input(true,saved.baseUrl(),"other-model","",false,8,80,600,"Prompt bài học mới","Prompt hỗ trợ mới"));
+        assertEquals("Prompt bài học mới",settings.current().systemPrompt);
+        assertEquals("Prompt hỗ trợ mới",settings.view(admin).supportSystemPrompt());
         settings.save(admin,new AiSettingsService.Input(false,saved.baseUrl(),"other-model","",true,8,80,600));
         assertFalse(settings.enabled());assertFalse(settings.view(admin).keyConfigured());
+        assertEquals("Prompt bài học mới",settings.view(admin).systemPrompt(),"Legacy updates preserve prompts");
+        settings.save(admin,new AiSettingsService.Input(false,saved.baseUrl(),"other-model","",false,8,80,600," ",""));
+        assertEquals(AiPrompts.LESSON,settings.current().systemPrompt);
+        assertNull(jdbc.queryForObject("SELECT system_prompt FROM ai_settings WHERE id=1",String.class));
     }
     @Test void databaseQuotaStoresOnlyHashesAndCapsSameIpAcrossGuests() {
         // Independent transactions commit the budget; delete only the records created by this test.

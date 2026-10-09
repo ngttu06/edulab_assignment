@@ -58,7 +58,7 @@ class SocialCommunityViewTest {
                         Map.of("id",2,"name","Toán","grade_level",10)));
                 var first=post(200L,"Minh Anh","Một buổi chiều thật đẹp. Bạn đã có khoảnh khắc nào vui hôm nay?",true,List.of());
                 var second=post(199L,"Bảo An","Góc học tập mới của mình. <script>window.untrustedPost=true</script>",false,
-                        List.of(Map.of("id",501L,"scan_status","CLEAN")));
+                        List.of(Map.of("id",501L,"scan_status","PENDING_SCAN","image_ready",true)));
                 second.put("reaction","LOVE");second.put("reaction_label","Yêu thích");second.put("liked",true);
                 request.setAttribute("posts",empty?List.of():detail?List.of(first):List.of(first,second));
                 wrapped.getRequestDispatcher("/WEB-INF/jsp/layout/default.jsp").forward(wrapped,response);
@@ -83,8 +83,19 @@ class SocialCommunityViewTest {
                 assertEquals(3,document.select("#utilityGrade option").size());
                 assertEquals(3,document.select("#utilitySubject option").size());
                 assertEquals("detail".equals(variant)?0:1,document.select("#socialForm").size());
+                assertEquals(0,document.select("#socialFileHint").size());
+                assertEquals(1,document.select("dialog#socialPostViewer[aria-labelledby=socialViewerTitle]").size());
+                assertEquals(1,document.select("#socialViewerDetails[aria-label='Nội dung bài viết và bình luận']").size());
+                assertEquals(1,document.select("#socialViewerClose[aria-label='Đóng bài viết']").size());
+                assertEquals(1,document.select("#socialViewerPrevious[aria-label='Ảnh trước']").size());
+                assertEquals(1,document.select("#socialViewerNext[aria-label='Ảnh tiếp theo']").size());
+                assertFalse(document.text().contains("Tự động nén"));
+                assertFalse(document.text().contains("Không quét antivirus"));
+                for(var described:document.select("[aria-describedby]"))
+                    for(String id:described.attr("aria-describedby").split("\\s+")) assertNotNull(document.getElementById(id),"Description exists: "+id);
                 assertEquals("empty".equals(variant)?1:0,document.select("#socialEmpty").size());
                 assertEquals("admin".equals(variant)?2:0,document.select("[data-action=hide]").size());
+                assertEquals(List.of("empty","detail").contains(variant)?0:1,document.select(".social-gallery img").size(),"Validated community image renders without CLEAN status");
                 for(var card:document.select(".social-post")) {
                     assertEquals(1,card.select("details.social-post-menu summary").size());
                     assertEquals(3,card.select(".social-actions button").size()); // Picker progressively enhanced by JS.

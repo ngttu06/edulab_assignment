@@ -156,7 +156,7 @@ public class ForumService {
         return id;
     }
     private void requireOwnAttachment(AuthenticatedUser user,long fileId) {
-        if(jdbc.queryForList("SELECT id FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status IN ('CLEAN','PENDING_SCAN') FOR UPDATE",fileId,user.id()).isEmpty())
+        if(jdbc.queryForList("SELECT id FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status IN ('CLEAN','PENDING_SCAN') AND storage_key NOT LIKE '%/community/files/%' FOR UPDATE",fileId,user.id()).isEmpty())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Tệp đính kèm không hợp lệ.");
     }
     @Transactional
@@ -166,7 +166,7 @@ public class ForumService {
         if (!thread.get("status").equals("PUBLISHED")) throw new ResponseStatusException(HttpStatus.CONFLICT, "Thảo luận đã khóa.");
         long postId = insert("INSERT INTO forum_posts(thread_id,author_id,body) VALUES(?,?,?)", threadId, user.id(), body.trim());
         for (long fileId : fileIds.stream().distinct().toList()) {
-            var files = jdbc.queryForList("SELECT id FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status IN ('CLEAN','PENDING_SCAN') FOR UPDATE", fileId, user.id());
+            var files = jdbc.queryForList("SELECT id FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status IN ('CLEAN','PENDING_SCAN') AND storage_key NOT LIKE '%/community/files/%' FOR UPDATE", fileId, user.id());
             if (files.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tệp đính kèm không hợp lệ.");
             jdbc.update("INSERT INTO forum_post_attachments(forum_post_id,stored_file_id) VALUES(?,?)", postId, fileId);
         }

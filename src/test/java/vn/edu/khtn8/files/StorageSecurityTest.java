@@ -47,6 +47,16 @@ class StorageSecurityTest {
         mvc.perform(post("/api/v1/files").with(user(actor("STUDENT"))).with(csrf())).andExpect(status().isGone());
         verifyNoInteractions(uploads,files,r2);
     }
+    @Test void communityPresignAlsoRequiresAuthenticationCsrfAndReturnsNoStore() throws Exception {
+        String body="{\"filename\":\"community-00000000-0000-4000-8000-000000000001.jpg\",\"contentType\":\"image/jpeg\",\"size\":500}";
+        mvc.perform(post("/api/v1/files/community/presign").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/files/community/presign").with(user(actor("STUDENT"))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        verifyNoInteractions(uploads);
+        when(uploads.presignCommunity(any(),any())).thenReturn(new DirectUploadService.Ticket("fixture","https://storage.test/object","PUT",java.util.Map.of("Content-Type","image/jpeg"),300));
+        mvc.perform(post("/api/v1/files/community/presign").with(user(actor("STUDENT"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.method").value("PUT"));
+        verify(uploads).presignCommunity(any(),any());
+    }
     @Test void storageConfigurationOnlyAdminAndSecretsNeverReturned() throws Exception {
         mvc.perform(get("/api/v1/admin/storage-settings")).andExpect(status().isUnauthorized());
         for(String role:List.of("STUDENT","PARENT","TEACHER")) {

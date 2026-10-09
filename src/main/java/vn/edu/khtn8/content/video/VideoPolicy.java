@@ -16,18 +16,24 @@ public class VideoPolicy {
     private static final Pattern HOST = Pattern.compile("(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}");
     private static final Pattern YOUTUBE_ID = Pattern.compile("[A-Za-z0-9_-]{11}");
     private final List<String> hosts;
+    private final boolean allHosts;
     private final String playerPath;
     public VideoPolicy(@Value("${EDULAB_VIDEO_ALLOWED_HOSTS:}") String hosts,
                        @Value("${EDULAB_PLAYERJS_PATH:/js/vendor/playerjs.js}") String playerPath) {
         this.hosts = Arrays.stream(hosts.split(",")).map(String::trim).filter(s -> !s.isEmpty())
                 .map(s -> s.toLowerCase(Locale.ROOT)).distinct().toList();
-        if (this.hosts.stream().anyMatch(h -> !HOST.matcher(h).matches() || h.endsWith(".local") || h.endsWith(".localhost")))
-            throw new IllegalArgumentException("EDULAB_VIDEO_ALLOWED_HOSTS chỉ nhận domain công khai, không có wildcard, cổng hoặc URL.");
+        this.allHosts = this.hosts.isEmpty() || this.hosts.equals(List.of("*"));
+        if (!allHosts && this.hosts.stream().anyMatch(h -> !publicHost(h)))
+            throw new IllegalArgumentException("EDULAB_VIDEO_ALLOWED_HOSTS nhận domain công khai hoặc * để cho phép mọi domain HTTPS; không nhận wildcard từng phần, cổng hoặc URL.");
         if (!playerPath.matches("/js/[A-Za-z0-9_/-]+\\.js") || playerPath.contains(".."))
             throw new IllegalArgumentException("EDULAB_PLAYERJS_PATH phải là đường dẫn /js/...js cùng website.");
         this.playerPath = playerPath;
     }
     public List<String> hosts() { return hosts; }
+    public boolean allowsAllHosts() { return allHosts; }
+    public String cspSources() {
+        return allHosts ? "https:" : hosts.stream().map(h -> "https://" + h).collect(java.util.stream.Collectors.joining(" "));
+    }
     public String playerPath() { return playerPath; }
     public boolean playerAvailable() { return new ClassPathResource("static" + playerPath).exists(); }
     public record Source(String url, String youtubeId) { }
@@ -51,13 +57,18 @@ public class VideoPolicy {
             return new Source("https://www.youtube.com/watch?v=" + id, id);
         }
         if (!"PLAYERJS".equals(provider)) throw bad("Nguồn video không hợp lệ.");
-        if (!hosts.contains(host)) throw bad("Domain m3u8 chưa được admin cho phép trong EDULAB_VIDEO_ALLOWED_HOSTS.");
-        if (!uri.getPath().toLowerCase(Locale.ROOT).endsWith(".m3u8")) throw bad("Link PlayerJS phải trỏ tới tệp .m3u8.");
+        if (!publicHost(host)) throw bad("Video cần domain HTTPS hợp lệ, không dùng IP, localhost hoặc domain nội bộ .local/.localhost.");
+        if (!allHosts && !hosts.contains(host)) throw bad("Domain video chưa được admin cho phép trong EDULAB_VIDEO_ALLOWED_HOSTS.");
+        String path = uri.getPath().toLowerCase(Locale.ROOT);
+        if (!path.endsWith(".m3u8") && !path.endsWith(".mp4")) throw bad("Link video phải trỏ tới tệp .m3u8 hoặc .mp4.");
         // PlayerJS source syntax uses brackets and separators; never interpret them from an input URL.
-        if (value.matches("(?s).*[\\[\\]{}\\s\\\\].*")) throw bad("Link m3u8 chứa ký tự điều khiển nguồn không hợp lệ; hãy dùng URL đã encode.");
+        if (value.matches("(?s).*[\\[\\]{}\\s\\\\].*")) throw bad("Link video chứa ký tự điều khiển nguồn không hợp lệ; hãy dùng URL đã encode.");
         String normalized=uri.toASCIIString();
-        if (normalized.length()>2048) throw bad("Link m3u8 sau khi encode vượt 2048 ký tự.");
+        if (normalized.length()>2048) throw bad("Link video sau khi encode vượt 2048 ký tự.");
         return new Source(normalized, null);
+    }
+    private static boolean publicHost(String host) {
+        return HOST.matcher(host).matches() && !host.endsWith(".local") && !host.endsWith(".localhost");
     }
     private static ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
 }

@@ -9,13 +9,21 @@
             xhr.upload.onprogress = event => { if (event.lengthComputable) progress(Math.round(event.loaded * 100 / event.total)); };
             const abort = () => xhr.abort();
             signal.addEventListener('abort', abort, {once:true});
-            const done = () => signal.removeEventListener('abort', abort);
+            const done = () => {
+                signal.removeEventListener('abort', abort);
+                xhr.onload = xhr.onerror = xhr.ontimeout = xhr.onabort = null;
+                xhr.upload.onprogress = null;
+            };
             xhr.onload = () => { done(); xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('R2 từ chối upload. URL có thể hết hạn; hãy thử lại.')); };
-            xhr.onerror = () => { done(); reject(new Error('Không kết nối được R2. Kiểm tra mạng, CORS đúng origin/cổng và CSP.')); };
+            xhr.onerror = () => {
+                done();
+                reject(new Error('Không kết nối được R2. Kiểm tra mạng/CSP; trong Cloudflare → R2 → bucket → Settings → CORS, cho phép origin '+window.location.origin+' với method PUT và header Content-Type. CORS phải được cấu hình trên R2, không phải server ứng dụng.'));
+            };
             xhr.ontimeout = () => { done(); reject(new Error('Upload hết thời gian chờ. Hãy thử lại.')); };
             xhr.onabort = () => { done(); reject(new Error('Đã hủy upload.')); };
             if (signal.aborted) { done(); reject(new Error('Đã hủy upload.')); return; }
-            xhr.send(file);
+            try { xhr.send(file); }
+            catch { done(); reject(new Error('Không thể bắt đầu upload R2. Kiểm tra kết nối và thử lại.')); }
         });
     }
     window.edulabUploads = {

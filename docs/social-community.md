@@ -2,11 +2,21 @@
 
 - `/community` và `/api/v1/community/**` dành cho bài viết, ảnh, lượt thích, bình luận và báo cáo. `/forum` và `/quizzes` giữ nguyên dữ liệu, API và mục đích học tập.
 - Migration additive `V19__social_community.sql` tạo bảng riêng, không chuyển hoặc xóa câu hỏi cũ. Bảng tin và ảnh chỉ đọc bởi thành viên đã đăng nhập; CSRF bắt buộc với mọi request ghi.
-- Ảnh JPEG/PNG/WebP dưới 20 MiB được trình duyệt giải mã, vẽ lại thành JPEG không kèm EXIF/GPS, cạnh dài không quá 1600 px, giảm chất lượng/kích thước xuống mục tiêu 300 KiB và giới hạn 500 KiB. Tối đa 5 ảnh/bài. Bản JPEG nén được gửi thẳng lên R2 bằng presigned URL đang có; server kiểm tra CLEAN, uploader, tên file tạo bởi client, MIME, SHA-256, kích thước, đọc giải mã và metadata trước khi gắn vào bài. PDF và ảnh bài tập diễn đàn không đi qua luồng này. Chất lượng/dung lượng chính xác tùy hình ảnh và trình duyệt; nén không đảm bảo một số byte tuyệt đối tối thiểu.
-- Nếu R2 chưa bật hoặc ClamAV chưa sẵn sàng, ảnh không thể được đăng ngay. File bị cách ly không được hiển thị; cần cấu hình scanner để sử dụng ảnh trên môi trường thật. Không bật chế độ bỏ qua scan ngoài môi trường thử nghiệm.
+- Ảnh JPEG/PNG/WebP dưới 20 MiB được trình duyệt giải mã, vẽ lại thành JPEG không kèm EXIF/GPS, cạnh dài không quá 1600 px, giảm chất lượng/kích thước xuống mục tiêu 300 KiB và giới hạn 500 KiB. Tối đa 5 ảnh/bài. Bản JPEG nén được gửi thẳng lên R2 bằng luồng riêng `/api/v1/files/community/presign`; server kiểm tra uploader, MIME/tên file, SHA-256, kích thước, giải mã và metadata trước khi xác nhận và gắn vào bài. PDF và ảnh bài tập diễn đàn không đi qua luồng này. Chất lượng/dung lượng chính xác tùy hình ảnh và trình duyệt; nén không đảm bảo một số byte tuyệt đối tối thiểu.
+- JPEG canvas có thể chứa ICC/APP2 (đã tái hiện trên Chrome). Client loại APP metadata/comment, chỉ giữ JFIF và dữ liệu ảnh trước upload; không nới lỏng policy backend. Ảnh nhỏ hơn 320 px vẫn được xử lý, không phóng lớn. Giao diện không hiển thị dòng hướng dẫn kỹ thuật, dung lượng nén hoặc thông báo đã nén; preview và tiến trình upload giữ nguyên. Lỗi hết hạn/hủy/từ chối có thông báo riêng.
+- Theo yêu cầu chủ sở hữu ngày 09/10/2026, **ảnh mới upload qua Cộng đồng không quét antivirus/ClamAV và không chờ scanner**. R2 vẫn phải bật. Đây là đánh đổi bảo mật: kiểm tra định dạng/nén ảnh không bảo đảm ảnh không có mã độc. Không bật `EDULAB_DEV_SCAN_BYPASS` toàn ứng dụng; file diễn đàn/AI vẫn theo yêu cầu quét cũ.
 - Tác giả có thể sửa nội dung/xóa (ẩn) bài, thành viên có thể bình luận/thích/báo cáo. Admin xem và xử lý báo cáo tại `/admin/community/reports`, ẩn hoặc mở lại bài. Ảnh bài đã ẩn/xóa mất quyền tải của thành viên khác. Object R2 của bài đã xóa và file upload bỏ dở **chưa có cơ chế dọn sau cùng**: cần quy trình retention/lifecycle và đối soát tham chiếu trước khi triển khai thật; không xóa vật lý trong transaction để tránh lệch database/object store.
 - Deployment cloud đã sao lưu/phục hồi diễn tập và áp dụng V19 ngày 08/10/2026 qua migration job riêng, sau đó trả `EDULAB_MIGRATE_ON_DEPLOY=false`; chi tiết ở `/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`. Web app không tự sửa schema.
-- Cloud hiện chưa cấu hình `EDULAB_CLAMAV_HOST`: bài viết chữ hoạt động, còn ảnh mới sẽ chờ quét và không đăng được cho đến khi có scanner thật. Không bỏ qua bước quét chỉ để upload chạy.
+- Cloud chưa cấu hình `EDULAB_CLAMAV_HOST`: **không còn chặn ảnh mới upload bằng luồng Cộng đồng**, nhưng file đính kèm diễn đàn/AI vẫn bị cách ly. Ảnh upload trước thay đổi bằng luồng generic không tự chuyển trạng thái; hãy chọn/upload lại qua Cộng đồng. Không sửa hàng loạt file cũ thành CLEAN.
+- Ngày 09/10/2026 đã sửa CORS bucket R2 cho origin container cổng 8088 và xác nhận PUT thật bằng Chrome sạch; giữ rule cổng 8085. Chi tiết triển khai/rollback ở `/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`. Không dùng kiểm tra đường truyền này để tuyên bố antivirus hoặc luồng đăng ảnh end-to-end cloud đã được kiểm chứng.
+
+## Phạm vi ảnh không quét antivirus
+
+- API cấp ticket riêng vẫn yêu cầu đăng nhập/CSRF, quota/rate limit, giới hạn JPEG 512000 byte và tên `community-{UUID}.jpg`. Server tạo keys `{prefix}/community/staging/{uploadId}` và `{prefix}/community/files/{uploadId}`; client không được quyết định key hay scan status.
+- Xác nhận upload vẫn HEAD/copy nội bộ/đọc **bản final**, kiểm size/MIME/hash, giải mã JPEG và loại metadata trước khi lưu. Không gọi `FileScanner.scan()` cho key Cộng đồng. Vẫn ghi `scan_status=PENDING_SCAN` để biểu thị chưa quét, không giả lập CLEAN; API trả `communityReady=true`, feed trả `image_ready=true` để hiển thị. Scheduler loại prefix Cộng đồng khỏi hàng đợi quét, không để chúng chiếm chỗ file thường.
+- Quyền tải/preview giữ nguyên: uploader/admin hoặc thành viên có quyền xem bài PUBLISHED. Bài bị ẩn/xóa mất quyền xem của thành viên khác. File REJECTED/INFECTED không hiển thị; hash/định dạng được kiểm lại lúc đọc. Không lộ storage key/URL trong feed.
+- File dùng prefix Cộng đồng không được gắn vào diễn đàn hoặc gửi AI. Upload qua `/api/v1/files/presign` dù có tên `community-...jpg` vẫn quét như cũ và không được bỏ qua chỉ dựa vào tên.
+- Không đổi schema V20 hoặc khóa/runtime guards. Lifecycle R2 nếu dùng cần bổ sung prefix `edulab/community/staging/`, không áp dụng lifecycle xóa vào `edulab/community/files/`. File đã hoàn tất nhưng chưa gắn bài vẫn cần quy trình retention riêng.
 
 Kiểm thử local (chỉ MySQL dùng một lần tại `127.0.0.1:3307/edulab_test`):
 
@@ -20,8 +30,11 @@ Browser smoke chỉ chạy với app đang chạy trên loopback và DB thử ng
 ## Giao diện bảng tin và kiểm thử không cần database
 
 - Đã bỏ banner `social-hero`; khung đăng bài nằm ngay dưới tab Trang chủ/Cộng đồng. Giữ cột tiện ích học tập dùng chung với Trang chủ.
+- Cột `.utility-column` giữ nguyên nội dung; ở desktop từ 1280 px dùng sticky dưới header và giới hạn chiều cao theo viewport. Cuộn bảng tin không kéo cột tiện ích đi; nội dung tiện ích dài có thanh cuộn riêng. Dưới breakpoint vẫn xếp dọc như shell hiện có, không ghim khung đè lên bảng tin.
+- Bấm ảnh, thời gian hoặc nội dung bài có ảnh mở dialog chi tiết: ảnh lớn không crop, nút trước/sau, thumbnail và số thứ tự; bên cạnh là tác giả/nội dung/cảm xúc/bình luận, có xem thêm, gửi/sửa/xóa bình luận. Desktop hai cột, mobile toàn màn hình xếp dọc. Có liên kết mở trang bài riêng. Ctrl/Cmd-click và khi JavaScript tắt vẫn giữ liên kết ảnh/trang gốc.
+- Viewer chuyển chính DOM bài viết vào dialog, không clone: không trùng ID, không mất draft/cursor/cảm xúc và không lệch dữ liệu giữa feed với popup. Đóng bằng nút, Esc hoặc backdrop sẽ trả bài về chỗ cũ, khôi phục vị trí cuộn/focus; xóa/ẩn bài trong popup không chèn lại bài đã gỡ. Bàn phím trái/phải chuyển ảnh, không chặn phím trong ô nhập/bộ chọn cảm xúc; native dialog giới hạn focus và làm nền inert. Lỗi ảnh/bình luận có trạng thái rõ và bình luận có thể tải lại. Không thêm API, thư viện hoặc migration.
 - Khung đăng bài gọn với avatar, ô “Bạn đang nghĩ gì?”, chọn ảnh và nút đăng. Bài viết dùng avatar tròn, menu ba chấm, ảnh sát mép thẻ, hàng Thích/Bình luận/Chia sẻ và ô bình luận bo tròn. Chia sẻ hiện là sao chép liên kết, không đăng lại bài.
-- Menu ba chấm dùng `details/summary`: mở bằng Enter, chuyển thao tác bằng Tab, đóng bằng Escape hoặc bấm ra ngoài. Trạng thái mở bình luận có `aria-expanded`/`aria-controls`. Ảnh chưa CLEAN vẫn không hiển thị.
+- Menu ba chấm dùng `details/summary`: mở bằng Enter, chuyển thao tác bằng Tab, đóng bằng Escape hoặc bấm ra ngoài. Trạng thái mở bình luận có `aria-expanded`/`aria-controls`. Ảnh hiển thị khi `image_ready` từ server hoặc CLEAN (ảnh cũ); ảnh không được xác nhận hoặc REJECTED/INFECTED không hiển thị.
 - `SocialCommunityViewTest` khởi động Tomcat chỉ trên loopback để render JSP thật với dữ liệu giả; tắt Spring initializer, không nạp datasource hay secrets. Tạo HTML cho bảng tin, trang chi tiết, trạng thái trống và admin trong `/Users/ngttu/Workspace/project_asm_prj/target/community-ui-fixtures/`.
 - `social-community-ui.cjs` dùng các HTML đó và CSS/JS thật; chặn toàn bộ mạng bằng Playwright, giả lập API. Kiểm tra tương tác và 7 độ rộng 320–1440 px, không cần MySQL hoặc ứng dụng cloud. Ảnh chụp ở `/Users/ngttu/Workspace/project_asm_prj/target/community-ui-screenshots/`.
 
@@ -31,7 +44,9 @@ EDULAB_PLAYWRIGHT_PATH=/Users/ngttu/Workspace/project_asm_prj/.tools/browser/nod
   node /Users/ngttu/Workspace/project_asm_prj/src/test/browser/social-community-ui.cjs
 ```
 
-Có thể đặt `EDULAB_CHROME_PATH` nếu Chrome không nằm ở vị trí mặc định trên macOS. Kiểm thử giả lập không thay thế kiểm thử tích hợp upload/ClamAV trên môi trường thử riêng.
+Có thể đặt `EDULAB_CHROME_PATH` nếu Chrome không nằm ở vị trí mặc định trên macOS. Browser offline kiểm tra nén/upload giả lập bằng luồng Cộng đồng với `communityReady=true` dù `scanStatus=PENDING_SCAN`, hiển thị ảnh và không dùng ticket generic. Kiểm thử giả lập không thay thế kiểm thử mạng R2 hoặc đăng ảnh end-to-end bằng tài khoản cloud.
+
+Browser suite ghi 4 JPEG thực tế (ảnh lớn và PNG/JPEG/WebP 32×24 px) vào `/Users/ngttu/Workspace/project_asm_prj/target/community-upload-fixtures/`. Sau browser, dùng `-Dedulab.test.browserUploads=true` khi chạy `DirectUploadMysqlTest` trên MySQL test loopback: kiểm tra chính các byte này qua policy backend → complete → đăng bài → preview (R2 mock, transaction rollback). Không dùng `clean` giữa browser và Java vì sẽ xóa fixtures. Có thể kiểm policy riêng, offline bằng source launcher `src/test/browser/CommunityImageValidation.java` với classpath `target/classes` và các dependency Maven; truyền các đường dẫn JPEG làm arguments.
 
 ## Bình luận và cảm xúc — V20
 

@@ -5,6 +5,7 @@
     const student = root.dataset.student === 'true', durationMs = Number(root.dataset.duration) * 1000;
     const notice = document.getElementById('videoNotice'), loading = document.getElementById('playerLoading');
     const seek = document.getElementById('videoSeek'), play = document.getElementById('videoPlay');
+    const frame = document.getElementById('videoFrame'), fullscreen = document.getElementById('videoFullscreen');
     const endpoint = '/api/v1/lessons/' + root.dataset.lesson + '/video';
     let adapter, session, sequence = 1, confirmed = [], pending = [], lastSample, ready = false, halted = false;
     let position = 0, inFlight, retryReport, activityTimer, saveTimer, saveRequested = false;
@@ -35,6 +36,12 @@
         line.setAttribute('x1',String(x)); line.setAttribute('x2',String(x));
         seek.value = String(position/1000); seek.setAttribute('aria-valuetext',time(position));
         document.getElementById('videoTime').textContent = time(position) + ' / ' + time(durationMs);
+        const playing = Boolean(adapter?.playing()) && !halted;
+        play.classList.toggle('is-playing', playing);
+        play.setAttribute('aria-label', playing ? 'Tạm dừng video' : 'Phát video');
+        play.title = playing ? 'Tạm dừng video' : 'Phát video';
+        const aiTime = document.getElementById('videoAiTime');
+        if (aiTime) aiTime.textContent = time(position);
         document.getElementById('videoPercent').textContent = percent + '%';
         document.getElementById('videoProgress').value = percent;
         document.getElementById('watchedTime').textContent = 'Đã xem ' + time(watched) + ' / ' + time(durationMs) + ' · ' + ranges.length + ' đoạn.';
@@ -94,10 +101,15 @@
             session = progress.sessionId; confirmed = progress.progress.ranges; position = progress.progress.positionMs; draw();
             let initialized = false;
             const onReady = () => setTimeout(() => {
-                if (!adapter || initialized) return;
+                if (!adapter || adapter.duration() <= 0 || initialized || halted) return;
                 initialized = true; ready = true; loading.hidden = true;
                 play.disabled = false; seek.disabled = false;
-                document.getElementById('videoFullscreen').disabled = !document.getElementById('videoFrame').requestFullscreen;
+                fullscreen.disabled = !(frame.requestFullscreen || frame.webkitRequestFullscreen);
+                root.videoContext = {
+                    position: () => Math.round(Math.max(0, Math.min(durationMs, adapter.time()*1000))),
+                    pause: () => { sample(true); lastSample=null; adapter.pause(); save(); }
+                };
+                root.dispatchEvent(new Event('edulab:video-ready'));
                 if (position && position < durationMs-1000) adapter.seek(position/1000);
                 else if (position >= durationMs-1000) { position=0; adapter.seek(0); draw(); }
                 notice.textContent = student ? 'Đã khôi phục các đoạn đã xem. Bấm Phát để tiếp tục học.' : 'Xem thử: không lưu tiến độ.';
@@ -112,7 +124,7 @@
             });
             // Also supports free builds without Events tracking: readiness and playback can be polled through API.
             const poll = setInterval(() => { if (halted || initialized) clearInterval(poll); else if (adapter.duration()>0) { clearInterval(poll); onReady(); } },500);
-            setTimeout(() => { clearInterval(poll); if (!initialized && !halted) fail(new Error('Trình phát chưa tải được metadata. Kiểm tra bản PlayerJS/HLS, link và CORS rồi tải lại trang.')); },25000);
+            setTimeout(() => { clearInterval(poll); if (!initialized && !halted) fail(new Error('Trình phát chưa tải được metadata. Kiểm tra nguồn MP4/HLS, bản PlayerJS (nếu dùng HLS), link và CORS rồi tải lại trang.')); },25000);
         } catch (error) { fail(error); }
     }
     play.addEventListener('click',() => {
@@ -124,8 +136,23 @@
         lastSample = null; position = Math.round(Number(seek.value)*1000); adapter?.seek(position/1000); draw();
     });
     seek.addEventListener('change',() => save());
-    document.getElementById('videoFullscreen').addEventListener('click',async () => {
-        try { await document.getElementById('videoFrame').requestFullscreen(); }
+    const fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+    function syncFullscreen() {
+        const active = fullscreenElement() === frame;
+        frame.classList.toggle('is-fullscreen', active);
+        fullscreen.setAttribute('aria-pressed', String(active));
+        fullscreen.setAttribute('aria-label', active ? 'Thoát toàn màn hình' : 'Toàn màn hình');
+        fullscreen.title = active ? 'Thoát toàn màn hình' : 'Toàn màn hình';
+        document.getElementById('videoFullscreenLabel').textContent = fullscreen.title;
+    }
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    document.addEventListener('webkitfullscreenchange', syncFullscreen);
+    fullscreen.addEventListener('click',async () => {
+        try {
+            if (fullscreenElement() === frame) await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            else await (frame.requestFullscreen || frame.webkitRequestFullscreen).call(frame);
+            syncFullscreen();
+        }
         catch { notice.textContent = 'Trình duyệt không hỗ trợ toàn màn hình tùy biến. Các đoạn đã xem vẫn được lưu.'; }
     });
     document.addEventListener('visibilitychange',() => { if (document.hidden) { sample(true); lastSample=null; adapter?.pause(); save({keepalive:true}); } });

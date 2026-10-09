@@ -18,15 +18,15 @@
             <div class="col-md-4"><label for="storagePdfLimit" class="form-label">PDF tối đa (MB)</label><input id="storagePdfLimit" type="number" min="1" max="10" step="1" required class="form-control"></div>
             <div class="col-md-4"><label for="storageQuota" class="form-label">Storage mỗi tài khoản (MB)</label><input id="storageQuota" type="number" min="1" max="1024" step="1" required class="form-control"></div>
         </div>
-        <p class="small text-muted mt-3">File cần quét ClamAV trước khi dùng. Chưa có scanner hoặc scanner lỗi: tiếp tục cách ly. Bypass chỉ dành cho profile local với file mẫu tin cậy.</p>
+        <p class="small text-muted mt-3">File đính kèm diễn đàn/AI cần quét ClamAV trước khi tải hoặc gửi AI; thiếu scanner thì tiếp tục cách ly. Riêng ảnh Cộng đồng dùng luồng JPEG tối ưu không quét antivirus, vẫn kiểm tra định dạng, kích thước, metadata, hash và quyền sở hữu. Bypass toàn ứng dụng chỉ dành cho profile local với file mẫu tin cậy.</p>
         <div class="form-check"><input id="storageAiImages" type="checkbox" class="form-check-input"><label for="storageAiImages" class="form-check-label">Model AI đã được xác nhận đọc ảnh (OpenAI image_url)</label></div>
         <div class="form-check mb-3"><input id="storageAiPdf" type="checkbox" class="form-check-input"><label for="storageAiPdf" class="form-check-label">Model AI đã được xác nhận đọc PDF (OpenAI file_data)</label></div>
         <p class="small text-muted">Hai tùy chọn này không tự kiểm chứng model. Chỉ bật sau khi thử file mẫu; file gửi AI được đọc từ R2, kiểm tra hash và truyền dưới dạng dữ liệu, không công khai URL.</p>
         <div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" type="submit">Lưu cấu hình storage</button><button id="storageTest" type="button" class="btn btn-outline-primary">Kiểm tra PUT / CORS / đọc / xóa</button></div>
     </fieldset></form>
-    <details class="mt-3"><summary>CORS cho local hiện tại</summary><p class="small mt-2">Thiết lập trong Cloudflare → R2 → edulab → Settings → CORS. Không mở public bucket; origin không có /edulab. Đổi cổng thì đổi origin.</p><pre class="text-break small">[
+    <details class="mt-3"><summary>CORS cho container local (cổng 8088)</summary><p class="small mt-2">Thiết lập trong Cloudflare → R2 → bucket đang cấu hình → Settings → CORS. Không mở public bucket; origin chỉ gồm scheme, host và cổng, không có /edulab. Đổi cổng hoặc dùng HTTPS thì thêm đúng origin; giữ các origin đang sử dụng.</p><pre class="text-break small">[
   {
-    "AllowedOrigins": ["http://127.0.0.1:8085", "http://localhost:8085"],
+    "AllowedOrigins": ["http://127.0.0.1:8088", "http://localhost:8088"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["Content-Type"],
     "MaxAgeSeconds": 3600

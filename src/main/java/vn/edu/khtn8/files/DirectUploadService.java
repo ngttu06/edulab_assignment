@@ -27,8 +27,15 @@ public class DirectUploadService {
     public record Ticket(String uploadId,String url,String method,Map<String,String> headers,int expiresInSeconds) {
         @Override public String toString() { return "UploadTicket[redacted]"; }
     }
-    public record Status(String uploadId,Long fileId,String filename,String status,String scanStatus,String message) {}
+    public record Status(String uploadId,Long fileId,String filename,String status,String scanStatus,String message,boolean communityReady) {}
     public Ticket presign(AuthenticatedUser user,Input input) {
+        return presign(user,input,false);
+    }
+    public Ticket presignCommunity(AuthenticatedUser user,Input input) {
+        CommunityImagePolicy.validateMetadata(input.filename(),input.contentType(),input.size());
+        return presign(user,input,true);
+    }
+    private Ticket presign(AuthenticatedUser user,Input input,boolean community) {
         return tx.execute(transaction->{
             jdbc.queryForObject("SELECT id FROM users WHERE id=? AND enabled=TRUE FOR UPDATE",Long.class,user.id());
             var limits=settings.limits();
@@ -40,7 +47,8 @@ public class DirectUploadService {
             int recent=jdbc.queryForObject("SELECT COUNT(*) FROM file_uploads WHERE user_id=? AND created_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 1 HOUR)",Integer.class,user.id());
             if(active>=6 || recent>=30 || input.size()>limits.userQuotaBytes()-used-reserved) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Đã đạt hạn mức storage hoặc số lượt upload. Hủy lượt chưa dùng hoặc thử lại sau.");
             var p=settings.profile(limits.profileId());String id=UUID.randomUUID().toString();
-            String source=p.prefix+"/staging/"+id,target=p.prefix+"/files/"+id;
+            String prefix=p.prefix+(community?"/community":"");
+            String source=prefix+"/staging/"+id,target=prefix+"/files/"+id;
             jdbc.update("INSERT INTO file_uploads(id,user_id,profile_id,staging_key,final_key,filename,content_type,expected_bytes,expires_at) VALUES(?,?,?,?,?,?,?,?,DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 10 MINUTE))",id,user.id(),p.id,source,target,input.filename(),input.contentType(),input.size());
             var headers=Map.of("Content-Type",input.contentType());
             // Browser sets Content-Length for the Blob body; JS must not set this forbidden header.
@@ -68,9 +76,14 @@ public class DirectUploadService {
             if(destination.size()!=expected || !mime.equals(destination.contentType())) return reject(upload,p);
             byte[] bytes=r2.read(p,target,expected);
             if(bytes.length!=expected) return reject(upload,p);
-            try { FileValidator.validate((String)upload.get("filename"),mime,bytes,5242880,10485760); }
+            boolean community=CommunityImagePolicy.communityKey(target);
+            try {
+                FileValidator.validate((String)upload.get("filename"),mime,bytes,5242880,10485760);
+                if(community) CommunityImagePolicy.validate((String)upload.get("filename"),mime,bytes);
+            }
             catch(ResponseStatusException ex) { return reject(upload,p); }
-            String scan=scanner.scan(bytes);
+            // Community JPEGs are deliberately unscanned, never falsely marked CLEAN.
+            String scan=community?"PENDING_SCAN":scanner.scan(bytes);
             var generated=new GeneratedKeyHolder();
             jdbc.update(connection->{
                 var s=connection.prepareStatement("INSERT INTO stored_files(storage_key,original_filename,content_type,size_bytes,sha256,scan_status,uploaded_by,storage_profile_id) VALUES(?,?,?,?,?,?,?,?)",Statement.RETURN_GENERATED_KEYS);
@@ -102,9 +115,15 @@ public class DirectUploadService {
     private Status status(Map<String,Object> upload) {
         Long fileId=upload.get("stored_file_id")==null?null:((Number)upload.get("stored_file_id")).longValue();
         String state=(String)upload.get("status"),scan=fileId==null?null:jdbc.queryForObject("SELECT scan_status FROM stored_files WHERE id=?",String.class,fileId);
-        String message=fileId==null ? (state.equals("PENDING")?"Đang chờ upload trực tiếp R2.":"Upload hết hạn, bị hủy hoặc file không hợp lệ. Chọn file và thử lại.")
+        boolean communityReady=fileId!=null && "COMPLETED".equals(state) && CommunityImagePolicy.communityKey((String)upload.get("final_key")) && ("PENDING_SCAN".equals(scan) || "CLEAN".equals(scan));
+        String message=communityReady?"Ảnh đã sẵn sàng cho Cộng đồng.":fileId==null ? switch(state) {
+                    case "PENDING"->"Đang chờ upload trực tiếp R2.";
+                    case "EXPIRED"->"Lượt upload đã hết hạn. Hãy thử đăng lại để tải ảnh lên.";
+                    case "CANCELLED"->"Đã hủy upload. Hãy thử đăng lại khi sẵn sàng.";
+                    default->"File không hợp lệ hoặc không khớp thông tin upload. Chọn file và thử lại.";
+                }
                 : switch(scan) { case "CLEAN"->"File đã sẵn sàng.";case "PENDING_SCAN"->"File đã upload; đang cách ly chờ ClamAV. Chưa thể tải hoặc gửi AI.";default->"File bị từ chối; không thể tải hoặc gửi AI."; };
-        return new Status((String)upload.get("id"),fileId,(String)upload.get("filename"),state,scan,message);
+        return new Status((String)upload.get("id"),fileId,(String)upload.get("filename"),state,scan,message,communityReady);
     }
     @Scheduled(fixedDelay=60000)
     public void cleanup() {
@@ -124,7 +143,8 @@ public class DirectUploadService {
     @Scheduled(fixedDelay=30000)
     public void scanPending() {
         if(!scanner.ready()) return;
-        for(var file:jdbc.queryForList("SELECT * FROM stored_files WHERE storage_profile_id IS NOT NULL AND scan_status='PENDING_SCAN' ORDER BY id LIMIT 10")) {
+        for(var file:jdbc.queryForList("SELECT * FROM stored_files WHERE storage_profile_id IS NOT NULL AND scan_status='PENDING_SCAN' AND storage_key NOT LIKE '%/community/files/%' ORDER BY id LIMIT 10")) {
+            if(CommunityImagePolicy.communityKey((String)file.get("storage_key"))) continue;
             try {
                 var p=settings.profile(((Number)file.get("storage_profile_id")).longValue());
                 byte[] bytes=r2.read(p,(String)file.get("storage_key"),((Number)file.get("size_bytes")).longValue());

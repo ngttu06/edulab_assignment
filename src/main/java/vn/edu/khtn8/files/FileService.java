@@ -26,12 +26,13 @@ public class FileService {
 
     public ImagePreview image(AuthenticatedUser user, long id) throws IOException {
         var rows = jdbc.queryForList("SELECT original_filename,content_type,size_bytes,sha256 FROM stored_files WHERE id=? AND scan_status='CLEAN'", id);
+        if(rows.isEmpty()) rows=communityFiles(id);
         if (rows.isEmpty()) throw notFound();
         var file = rows.getFirst();
         String mime = (String)file.get("content_type");
         long length = ((Number)file.get("size_bytes")).longValue();
         if (!java.util.List.of("image/jpeg", "image/png", "image/webp").contains(mime) || length <= 0 || length > 5242880) throw notFound();
-        // Reuse download authorization; never expose an object-store URL or unscanned file.
+        // Reuse authorization; only validated community JPEGs may render without antivirus.
         var download = download(user, id);
         byte[] bytes;
         try (var input = download.resource().getInputStream()) { bytes = input.readNBytes((int)length + 1); }
@@ -43,10 +44,18 @@ public class FileService {
 
     public Download download(AuthenticatedUser user, long id) throws IOException {
         var rows = jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND scan_status='CLEAN'", id);
+        if(rows.isEmpty()) rows=communityFiles(id);
         if (rows.isEmpty()) throw notFound();
         var file = rows.getFirst();
-        if (((Number)file.get("uploaded_by")).longValue() != user.id() && !vn.edu.khtn8.school.SchoolService.hasRole(user,"ADMIN") && !forum.canDownload(user, id) && !social.canDownload(user,id)) throw notFound();
+        boolean community=CommunityImagePolicy.communityKey((String)file.get("storage_key"));
+        boolean owner=((Number)file.get("uploaded_by")).longValue()==user.id();
+        if(!owner && !vn.edu.khtn8.school.SchoolService.hasRole(user,"ADMIN") &&
+                !(community?social.canDownload(user,id):forum.canDownload(user,id) || social.canDownload(user,id))) throw notFound();
         long length=((Number)file.get("size_bytes")).longValue();
+        if(community) {
+            try {CommunityImagePolicy.validateMetadata((String)file.get("original_filename"),(String)file.get("content_type"),length);}
+            catch(ResponseStatusException invalid) {throw notFound();}
+        }
         Resource resource;
         if(file.get("storage_profile_id")==null) resource=storage.load((String)file.get("storage_key"));
         else {
@@ -54,7 +63,24 @@ public class FileService {
             if(bytes.length!=length || !S3Signer.sha256(bytes).equals(file.get("sha256"))) throw notFound();
             resource=new org.springframework.core.io.ByteArrayResource(bytes);
         }
+        if(community) {
+            byte[] bytes;
+            try(var input=resource.getInputStream()) {bytes=input.readNBytes((int)CommunityImagePolicy.MAX_BYTES+1);}
+            if(bytes.length!=length || !S3Signer.sha256(bytes).equals(file.get("sha256"))) throw notFound();
+            try {CommunityImagePolicy.validate((String)file.get("original_filename"),(String)file.get("content_type"),bytes);}
+            catch(ResponseStatusException invalid) {throw notFound();}
+            resource=new org.springframework.core.io.ByteArrayResource(bytes);
+        }
         return new Download(resource, (String)file.get("original_filename"), length);
+    }
+    private java.util.List<java.util.Map<String,Object>> communityFiles(long id) {
+        var rows=jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND scan_status='PENDING_SCAN'",id);
+        if(rows.isEmpty()) return rows;
+        var file=rows.getFirst();
+        if(!CommunityImagePolicy.communityKey((String)file.get("storage_key"))) return java.util.List.of();
+        try {CommunityImagePolicy.validateMetadata((String)file.get("original_filename"),(String)file.get("content_type"),((Number)file.get("size_bytes")).longValue());}
+        catch(ResponseStatusException invalid) {return java.util.List.of();}
+        return rows;
     }
     private ResponseStatusException notFound() { return new ResponseStatusException(HttpStatus.NOT_FOUND, "Tệp không khả dụng hoặc bạn không có quyền xem."); }
 }

@@ -2,13 +2,10 @@ package vn.edu.khtn8.community;
 
 import java.io.IOException;
 import java.sql.Statement;
-import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import javax.imageio.ImageIO;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -17,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import vn.edu.khtn8.files.FileStorage;
+import vn.edu.khtn8.files.CommunityImagePolicy;
 import vn.edu.khtn8.files.R2Client;
 import vn.edu.khtn8.files.S3Signer;
 import vn.edu.khtn8.files.StorageSettingsService;
@@ -41,13 +39,6 @@ public class SocialCommunityService {
         public String getLabel() {return label;}
     }
     public record Reaction(ReactionType reaction, long count, Map<String,Long> counts) { }
-    private static boolean communityName(Object filename) {
-        if(!(filename instanceof String name) || !name.startsWith("community-") || !name.endsWith(".jpg")) return false;
-        String id=name.substring(10,name.length()-4);
-        if(!id.matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")) return false;
-        try {UUID.fromString(id);return true;}
-        catch(IllegalArgumentException ex) {return false;}
-    }
 
     public Page feed(AuthenticatedUser user, boolean mine, Long before, int size) {
         if (size<1 || size>20 || (before!=null && before<=0)) throw bad("Phân trang không hợp lệ.");
@@ -74,13 +65,17 @@ public class SocialCommunityService {
         if(items.isEmpty()) return;
         String marks=String.join(",",java.util.Collections.nCopies(items.size(),"?"));
         Object[] ids=items.stream().map(p->p.get("id")).toArray();
-        var images=jdbc.queryForList("SELECT i.post_id,f.id,f.original_filename,f.scan_status FROM community_images i " +
+        var images=jdbc.queryForList("SELECT i.post_id,f.id,f.original_filename,f.scan_status,f.storage_key FROM community_images i " +
                 "JOIN stored_files f ON f.id=i.file_id WHERE i.post_id IN ("+marks+") ORDER BY i.post_id,i.position",ids);
         var comments=jdbc.queryForList("SELECT post_id,COUNT(*) total FROM community_comments WHERE status='PUBLISHED' AND post_id IN ("+marks+") GROUP BY post_id",ids);
         var params=new ArrayList<Object>(); params.add(user.id()); java.util.Collections.addAll(params,ids);
         var likes=jdbc.queryForList("SELECT post_id,reaction_type,COUNT(*) total,MAX(user_id=?) liked FROM community_likes WHERE post_id IN ("+marks+") GROUP BY post_id,reaction_type",params.toArray());
         var byPost=new HashMap<Long,List<Map<String,Object>>>();
-        for(var image:images) byPost.computeIfAbsent(number(image.get("post_id")),unused->new ArrayList<>()).add(image);
+        for(var image:images) {
+            String key=(String)image.remove("storage_key");
+            image.put("image_ready","CLEAN".equals(image.get("scan_status")) || "PENDING_SCAN".equals(image.get("scan_status")) && CommunityImagePolicy.communityKey(key));
+            byPost.computeIfAbsent(number(image.get("post_id")),unused->new ArrayList<>()).add(image);
+        }
         var commentCounts=new HashMap<Long,Long>();for(var row:comments) commentCounts.put(number(row.get("post_id")),number(row.get("total")));
         var reactionCounts=new HashMap<Long,Map<String,Long>>();
         var selected=new HashMap<Long,String>();
@@ -116,13 +111,14 @@ public class SocialCommunityService {
     }
     private void validateImage(AuthenticatedUser user,long fileId) {
         // Lock the file and ensure it has never been attached to a different post.
-        var files=jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status='CLEAN' AND content_type='image/jpeg' AND size_bytes<=512000 FOR UPDATE",fileId,user.id());
-        if(files.isEmpty() || !communityName(files.getFirst().get("original_filename")) ||
+        var files=jdbc.queryForList("SELECT * FROM stored_files WHERE id=? AND uploaded_by=? AND scan_status IN ('CLEAN','PENDING_SCAN') AND content_type='image/jpeg' AND size_bytes<=512000 FOR UPDATE",fileId,user.id());
+        if(files.isEmpty() || !CommunityImagePolicy.communityName(files.getFirst().get("original_filename")) ||
+                (!"CLEAN".equals(files.getFirst().get("scan_status")) && !CommunityImagePolicy.communityKey((String)files.getFirst().get("storage_key"))) ||
                 jdbc.queryForList("SELECT id FROM file_uploads WHERE stored_file_id=? AND status='COMPLETED' AND user_id=?",fileId,user.id()).isEmpty() ||
                 !jdbc.queryForList("SELECT file_id FROM community_images WHERE file_id=?",fileId).isEmpty() ||
                 !jdbc.queryForList("SELECT stored_file_id FROM forum_thread_attachments WHERE stored_file_id=?",fileId).isEmpty() ||
                 !jdbc.queryForList("SELECT stored_file_id FROM forum_post_attachments WHERE stored_file_id=?",fileId).isEmpty())
-            throw bad("Ảnh không hợp lệ, chưa quét xong hoặc đã thuộc bài khác.");
+            throw bad("Ảnh không hợp lệ, không thuộc luồng Cộng đồng hoặc đã thuộc bài khác.");
         var file=files.getFirst();
         // Reject untrusted full-size originals: browser canvas must create a small, metadata-free JPEG.
         byte[] bytes;
@@ -132,31 +128,11 @@ public class SocialCommunityService {
                 try(var input=local.load((String)file.get("storage_key")).getInputStream()) { bytes=input.readNBytes((int)size+1); }
             } else bytes=r2.read(settings.profile(number(file.get("storage_profile_id"))),(String)file.get("storage_key"),size);
         } catch(IOException ex) { throw bad("Không đọc được ảnh."); }
-        if(bytes.length!=number(file.get("size_bytes")) || !S3Signer.sha256(bytes).equals(file.get("sha256")) || hasExif(bytes)) throw bad("Ảnh không đúng định dạng đã tối ưu.");
-        try(var stream=ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
-            var readers=ImageIO.getImageReaders(stream);
-            if(!readers.hasNext()) throw bad("Ảnh không đọc được.");
-            var reader=readers.next();
-            try { reader.setInput(stream); int w=reader.getWidth(0),h=reader.getHeight(0);
-                if(w<1 || h<1 || Math.max(w,h)>1600 || (long)w*h>2_560_000 || reader.read(0)==null) throw bad("Ảnh vượt kích thước cho phép.");
-            } finally { reader.dispose(); }
-        } catch(IOException | IllegalArgumentException ex) { throw bad("Ảnh không đọc được."); }
+        if(bytes.length!=number(file.get("size_bytes")) || !S3Signer.sha256(bytes).equals(file.get("sha256"))) throw bad("Ảnh không đúng định dạng đã tối ưu.");
+        CommunityImagePolicy.validate((String)file.get("original_filename"),(String)file.get("content_type"),bytes);
     }
     static boolean hasExif(byte[] bytes) {
-        if(bytes.length<4 || (bytes[0]&255)!=255 || (bytes[1]&255)!=216) return true;
-        int pos=2;
-        while(pos+3<bytes.length && (bytes[pos]&255)==255) {
-            int marker=bytes[pos+1]&255;
-            if(marker==0xda || marker==0xd9) return false;
-            int length=((bytes[pos+2]&255)<<8)|(bytes[pos+3]&255);
-            if(length<2 || pos+2+length>bytes.length) return true;
-            if(marker==0xe1 || marker==0xe2 || marker==0xed || marker==0xfe || marker==0xe0 && !isJfif(bytes,pos+4,length-2) || marker==0xee) return true;
-            pos+=length+2;
-        }
-        return true;
-    }
-    private static boolean isJfif(byte[] bytes,int offset,int size) {
-        return size>=5 && bytes[offset]=='J' && bytes[offset+1]=='F' && bytes[offset+2]=='I' && bytes[offset+3]=='F' && bytes[offset+4]==0;
+        return CommunityImagePolicy.hasExif(bytes);
     }
     @Transactional
     public void edit(AuthenticatedUser user,long id,String body) {

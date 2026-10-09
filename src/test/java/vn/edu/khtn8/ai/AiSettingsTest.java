@@ -55,4 +55,28 @@ class AiSettingsTest {
     private AiSettingsService.Input input(boolean enabled,String url,String apiKey,boolean clear) {
         return new AiSettingsService.Input(enabled,url,"gpt-6.1-sol",apiKey,clear,20,200,1000);
     }
+    @Test void modelDiscoveryKeepsStoredKeyOnSameBaseUrlAndRequiresNewKeyWhenChangingProvider() {
+        var jdbc=mock(JdbcTemplate.class);var cipher=new AiSecretCipher(key);
+        var stored=new HashMap<String,Object>();stored.put("base_url","https://gatecheap.vn/v1");stored.put("encrypted_api_key",cipher.encrypt("stored-secret"));
+        when(jdbc.queryForMap(anyString())).thenReturn(stored);
+        var service=new AiSettingsService(jdbc,cipher,new AiEndpointPolicy("gatecheap.vn,api.openai.com"));
+        assertEquals("stored-secret",service.modelConnection(actor("ADMIN"),new AiSettingsService.ModelsInput("https://gatecheap.vn/v1/","")).apiKey);
+        assertThrows(ResponseStatusException.class,()->service.modelConnection(actor("ADMIN"),new AiSettingsService.ModelsInput("https://api.openai.com/v1","")));
+        assertEquals("new-secret",service.modelConnection(actor("ADMIN"),new AiSettingsService.ModelsInput("https://api.openai.com/v1","new-secret")).apiKey);
+        assertThrows(AccessDeniedException.class,()->service.modelConnection(actor("TEACHER"),new AiSettingsService.ModelsInput("https://gatecheap.vn/v1","")));
+        assertThrows(ResponseStatusException.class,()->service.modelConnection(actor("ADMIN"),new AiSettingsService.ModelsInput("https://evil.test/v1","new-secret")));
+        assertThrows(ResponseStatusException.class,()->service.modelConnection(actor("ADMIN"),new AiSettingsService.ModelsInput("https://gatecheap.vn/v1","bad\r\nkey")));
+        verify(jdbc,never()).update(anyString(),any(Object[].class));
+    }
+    @Test void savePersistsPromptsPreservesOmittedValuesAndResetsBlankToDefault() {
+        var jdbc=mock(JdbcTemplate.class);var previous=new HashMap<String,Object>();
+        previous.put("base_url","https://gatecheap.vn/v1");previous.put("system_prompt","old lesson");previous.put("support_system_prompt","old support");
+        when(jdbc.queryForMap(anyString())).thenReturn(previous);
+        var service=new AiSettingsService(jdbc,new AiSecretCipher(key),new AiEndpointPolicy("gatecheap.vn"));
+        service.save(actor("ADMIN"),new AiSettingsService.Input(false,"https://gatecheap.vn/v1","model","",false,10,100,500," new lesson "," "));
+        verify(jdbc).update(startsWith("UPDATE ai_settings"),eq(false),eq("https://gatecheap.vn/v1"),eq("model"),isNull(),eq(10),eq(100),eq(500),eq("new lesson"),isNull());
+        service.save(actor("ADMIN"),input(false,"https://gatecheap.vn/v1","",false));
+        verify(jdbc).update(startsWith("UPDATE ai_settings"),eq(false),eq("https://gatecheap.vn/v1"),eq("gpt-6.1-sol"),isNull(),eq(20),eq(200),eq(1000),eq("old lesson"),eq("old support"));
+        assertThrows(ResponseStatusException.class,()->service.save(actor("ADMIN"),new AiSettingsService.Input(false,"https://gatecheap.vn/v1","model","",false,10,100,500,"x".repeat(8001),"")));
+    }
 }

@@ -37,6 +37,7 @@ class DirectUploadMysqlTest {
     @Autowired AiAttachmentService attachments;
     @Autowired FileService files;
     @Autowired vn.edu.khtn8.community.ForumService forum;
+    @Autowired vn.edu.khtn8.community.SocialCommunityService social;
     @MockBean R2Client r2;
     @MockBean FileScanner scanner;
     AuthenticatedUser admin,student,other;
@@ -155,5 +156,100 @@ class DirectUploadMysqlTest {
         save(true,true,true,104857600);
         assertEquals("application/pdf",attachments.load(student,List.of(status.fileId())).getFirst().contentType());
         assertThrows(ResponseStatusException.class,()->attachments.load(student,List.of(status.fileId(),status.fileId(),status.fileId(),status.fileId())));
+    }
+    private byte[] communityJpeg() throws Exception {
+        var out=new java.io.ByteArrayOutputStream();
+        assertTrue(javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(32,24,java.awt.image.BufferedImage.TYPE_INT_RGB),"jpeg",out));
+        return out.toByteArray();
+    }
+    @Test void dedicatedCommunityUploadNeverCallsScannerAndCanPublishAndPreview() throws Exception {
+        byte[] bytes=communityJpeg();String name="community-00000000-0000-4000-8000-000000000001.jpg";
+        when(r2.head(any(),anyString())).thenReturn(new R2Client.Metadata(bytes.length,"image/jpeg","etag"));
+        when(r2.read(any(),anyString(),anyLong())).thenReturn(bytes);
+        clearInvocations(scanner);
+        var ticket=uploads.presignCommunity(student,new DirectUploadService.Input(name,"image/jpeg",bytes.length));
+        var completed=uploads.complete(student,ticket.uploadId());
+        assertEquals("PENDING_SCAN",completed.scanStatus());assertTrue(completed.communityReady());
+        assertEquals("Ảnh đã sẵn sàng cho Cộng đồng.",completed.message());
+        assertTrue(uploads.complete(student,ticket.uploadId()).communityReady());
+        verify(scanner,never()).scan(any());
+        long file=completed.fileId();
+        assertArrayEquals(bytes,files.image(student,file).download().resource().getContentAsByteArray());
+        assertThrows(ResponseStatusException.class,()->files.image(other,file));
+        long post=social.create(student,"Ảnh đăng ngay",List.of(file));
+        var image=(Map<?,?>)((List<?>)social.post(other,post).get("images")).getFirst();
+        assertEquals(true,image.get("image_ready"));assertFalse(image.containsKey("storage_key"));
+        assertArrayEquals(bytes,files.image(other,file).download().resource().getContentAsByteArray());
+        long category=((Number)forum.categories(student).getFirst().get("id")).longValue();
+        assertThrows(ResponseStatusException.class,()->forum.create(student,category,"No bypass","Body",null,List.of(file)));
+        long thread=forum.create(student,category,"Normal thread","Body");
+        assertThrows(ResponseStatusException.class,()->forum.reply(student,thread,"No bypass",List.of(file)));
+        assertThrows(ResponseStatusException.class,()->attachments.load(student,List.of(file)));
+        jdbc.update("UPDATE stored_files SET scan_status='CLEAN' WHERE id=?",file);
+        assertThrows(ResponseStatusException.class,()->attachments.load(student,List.of(file)),"Even mislabelled community files cannot bypass AI scanning");
+        jdbc.update("UPDATE stored_files SET scan_status='PENDING_SCAN' WHERE id=?",file);
+        when(scanner.ready()).thenReturn(true);clearInvocations(scanner);uploads.scanPending();verify(scanner,never()).scan(any());
+        social.moderate(admin,post,true);assertThrows(ResponseStatusException.class,()->files.image(other,file));
+        assertNotNull(files.image(student,file));
+        jdbc.update("UPDATE stored_files SET scan_status='INFECTED' WHERE id=?",file);
+        assertThrows(ResponseStatusException.class,()->files.image(student,file));
+    }
+    @Test void genericUploadsWithCommunityFilenameStillRequireAntivirus() throws Exception {
+        byte[] bytes=communityJpeg();String name="community-00000000-0000-4000-8000-000000000002.jpg";
+        when(r2.head(any(),anyString())).thenReturn(new R2Client.Metadata(bytes.length,"image/jpeg","etag"));
+        when(r2.read(any(),anyString(),anyLong())).thenReturn(bytes);when(scanner.scan(any())).thenReturn("PENDING_SCAN");
+        var ticket=uploads.presign(student,new DirectUploadService.Input(name,"image/jpeg",bytes.length));
+        var completed=uploads.complete(student,ticket.uploadId());
+        assertFalse(completed.communityReady());verify(scanner).scan(bytes);
+        assertThrows(ResponseStatusException.class,()->social.create(student,"No filename bypass",List.of(completed.fileId())));
+        assertThrows(ResponseStatusException.class,()->files.image(student,completed.fileId()));
+    }
+    @Test void malformedCommunityImagesAreRejectedBeforeScanOrPublication() {
+        String name="community-00000000-0000-4000-8000-000000000003.jpg";
+        byte[] fake={(byte)255,(byte)216,(byte)255,1};
+        when(r2.head(any(),anyString())).thenReturn(new R2Client.Metadata(fake.length,"image/jpeg","etag"));
+        when(r2.read(any(),anyString(),anyLong())).thenReturn(fake);
+        var ticket=uploads.presignCommunity(student,new DirectUploadService.Input(name,"image/jpeg",fake.length));
+        var completed=uploads.complete(student,ticket.uploadId());assertEquals("REJECTED",completed.status());assertNull(completed.fileId());assertFalse(completed.communityReady());
+        verify(scanner,never()).scan(any());
+        assertThrows(ResponseStatusException.class,()->uploads.presignCommunity(student,new DirectUploadService.Input("one.png","image/png",9)));
+        assertThrows(ResponseStatusException.class,()->uploads.presignCommunity(student,new DirectUploadService.Input(name,"image/jpeg",512001)));
+    }
+    @Test void uploadFailuresHaveSpecificMessagesAndNeverReadCancelledOrExpiredObjects() {
+        var cancelled=uploads.presign(student,new DirectUploadService.Input("cancelled.png","image/png",png.length));
+        assertTrue(uploads.cancel(student,cancelled.uploadId()).message().startsWith("Đã hủy upload."));
+        clearInvocations(r2);
+        assertEquals("CANCELLED",uploads.complete(student,cancelled.uploadId()).status());verifyNoInteractions(r2);
+        var expired=uploads.presign(student,new DirectUploadService.Input("expired.png","image/png",png.length));
+        jdbc.update("UPDATE file_uploads SET expires_at=DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 1 MINUTE) WHERE id=?",expired.uploadId());
+        clearInvocations(r2);
+        assertTrue(uploads.complete(student,expired.uploadId()).message().startsWith("Lượt upload đã hết hạn."));verifyNoInteractions(r2);
+        var invalid=uploads.presign(student,new DirectUploadService.Input("invalid.png","image/png",png.length));
+        when(r2.head(any(),anyString())).thenReturn(new R2Client.Metadata(100,"image/png","etag"));
+        var result=uploads.complete(student,invalid.uploadId());assertEquals("REJECTED",result.status());
+        assertTrue(result.message().startsWith("File không hợp lệ"));assertFalse(result.message().contains("hết hạn"));
+    }
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="edulab.test.browserUploads",matches="true")
+    void browserProducedJpegsCompletePublishAndPreviewWithoutMetadataExceptions() throws Exception {
+        var directory=java.nio.file.Path.of("target/community-upload-fixtures");
+        try(var paths=java.nio.file.Files.list(directory)) {
+            var fixtures=paths.filter(path->path.getFileName().toString().matches("browser-[1-4]\\.jpg")).sorted().toList();
+            assertEquals(4,fixtures.size(),"Run social-community-ui.cjs first");
+            for(var path:fixtures) {
+                byte[] bytes=java.nio.file.Files.readAllBytes(path);
+                String name="community-"+java.util.UUID.randomUUID()+".jpg";
+                when(r2.head(any(),anyString())).thenReturn(new R2Client.Metadata(bytes.length,"image/jpeg","etag"));
+                when(r2.read(any(),anyString(),anyLong())).thenReturn(bytes);
+                var ticket=uploads.presignCommunity(student,new DirectUploadService.Input(name,"image/jpeg",bytes.length));
+                var completed=uploads.complete(student,ticket.uploadId());
+                assertEquals("COMPLETED",completed.status());assertTrue(completed.communityReady());
+                assertEquals(completed.fileId(),uploads.complete(student,ticket.uploadId()).fileId());
+                long post=social.create(student,"Browser JPEG regression",List.of(completed.fileId()));
+                assertEquals(true,((Map<?,?>)((List<?>)social.post(other,post).get("images")).getFirst()).get("image_ready"));
+                assertArrayEquals(bytes,files.image(other,completed.fileId()).download().resource().getContentAsByteArray());
+            }
+            verify(scanner,never()).scan(any());
+        }
     }
 }

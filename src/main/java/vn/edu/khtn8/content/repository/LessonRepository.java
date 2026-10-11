@@ -29,7 +29,7 @@ public class LessonRepository {
                 WHERE l.status = 'PUBLISHED'
                   AND EXISTS (SELECT 1 FROM lesson_versions v WHERE v.lesson_id = l.id AND v.status = 'PUBLISHED')
                 """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId) + CatalogFilter.SQL + " AND CONCAT(l.title,' ',COALESCE(l.summary,''),' ',t.name) LIKE ? ESCAPE '!' " + """
-                ORDER BY s.grade_level,c.id,t.display_order, l.id
+                ORDER BY s.grade_level,c.id,t.display_order,l.display_order,l.id
                 """, (rs, n) -> new LessonSummary(rs.getLong("id"), rs.getString("topic_name"), rs.getString("title"),
                 rs.getString("slug"), rs.getString("summary"), rs.getInt("duration_minutes"),
                 rs.getString("progress_status"), rs.getInt("completion_percent"),rs.getLong("course_id"),rs.getString("course_title"),rs.getString("subject_name"),rs.getInt("grade_level"),rs.getObject("video_id")!=null), args.toArray());

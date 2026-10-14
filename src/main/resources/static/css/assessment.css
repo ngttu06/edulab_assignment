@@ -1,0 +1,12 @@
+.assessment-ai-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.assessment-question { min-width: 0; }
+.assessment-question legend, .assessment-question label { overflow-wrap: anywhere; }
+#quizForm .form-check-input:disabled ~ .form-check-label { opacity: 1; }
+.assessment-question[data-outcome="WRONG"] { border-inline-start: 4px solid var(--bs-danger, #b42318); }
+.assessment-question[data-outcome="CORRECT"] { border-inline-start: 4px solid var(--bs-success, #146c43); }
+.assessment-question[data-outcome="UNANSWERED"] { border-inline-start: 4px solid var(--bs-warning, #997404); }
+.assessment-chart { width: 100%; min-width: 560px; height: auto; max-height: 360px; color: var(--bs-body-color); }
+.assessment-chart rect { fill: var(--bs-primary, #0d6efd); }
+.assessment-chart text { fill: currentColor; font: 13px sans-serif; }
+.assessment-chart line { stroke: currentColor; }
+.assessment-import-warning { white-space: pre-wrap; overflow-wrap: anywhere; }

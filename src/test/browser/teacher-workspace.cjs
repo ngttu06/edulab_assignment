@@ -51,6 +51,7 @@ async function main() {
         await go(t,'/teacher/quizzes/new');
         await t.locator('#quizTitle').fill('Quiz trực tiếp '+stamp);await t.locator('[name=quizClass]').first().check();
         await t.locator('[data-field=content]').fill('1 + 1 = ?');await t.locator('[data-option]').nth(0).fill('2');await t.locator('[data-option]').nth(1).fill('3');
+        await t.locator('[data-field=correctIndex]').selectOption('0');
         await Promise.all([t.waitForURL(/\/teacher\/quizzes\/\d+$/),t.locator('#teacherQuizForm button[type=submit]').click()]);
         const manualId=Number(t.url().split('/').at(-1));assert.notEqual(manualId,quizId);
         assert.ok(!(await api(s,'/api/v1/quizzes')).some(q=>q.id===manualId));

@@ -14,6 +14,7 @@
 <h2 class="h5">Nội dung (HTML nguồn đã lọc)</h2><pre class="text-wrap text-break"><c:out value="${item.content_html}"/></pre>
 </c:when><c:otherwise>
 <p>${item.published ? 'Đã xuất bản' : 'Chưa xuất bản'} · <c:out value="${item.mode}"/> · Tối đa ${item.max_attempts} lượt</p>
+<p><a class="btn btn-primary" href="${pageContext.request.contextPath}/teacher/quizzes/${item.id}/report">Báo cáo, phổ điểm &amp; bài làm học sinh</a></p>
 <p>Công bố đáp án (UTC): <c:out value="${item.reveal_after}" default="Sau khi nộp (luyện tập)"/></p>
 <c:forEach var="q" items="${item.questions}" varStatus="n"><section class="card mb-3"><div class="card-body"><h2 class="h5">Câu ${n.count}: <c:out value="${q.content()}"/></h2><ol type="A"><c:forEach var="option" items="${q.options()}" varStatus="o"><li><c:out value="${option}"/> ${o.index == q.correctIndex() ? '✓ Đáp án đúng' : ''}</li></c:forEach></ol><p><c:out value="${q.explanation()}"/></p><small>Trọng số: ${q.points()}</small></div></section></c:forEach>
 </c:otherwise></c:choose>

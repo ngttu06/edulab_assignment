@@ -1,5 +1,9 @@
 # Không gian giáo viên
 
+Quiz/đề kiểm tra hiện có xem lại bài học sinh, báo cáo phổ điểm, nhận xét AI,
+ghi nhận rời tab và nhập PDF/DOCX có xác nhận đáp án thiếu. Xem hướng dẫn và
+giới hạn tại `/Users/ngttu/Workspace/project_asm_prj/docs/assessment.md`.
+
 ## Sử dụng
 
 Đăng nhập bằng tài khoản `TEACHER` (hoặc `ADMIN`). Quản trị viên phải phân công

@@ -2,10 +2,10 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ include file="nav.jspf" %>
 <a href="${pageContext.request.contextPath}/teacher/${kind}">← Danh sách</a>
-<h1 class="h3 my-3">${empty editId ? (importMode ? "Nhập quiz từ CSV" : "Tạo mới") : "Chỉnh sửa"}</h1>
+<h1 class="h3 my-3">${empty editId ? (importMode ? "Nhập quiz / đề kiểm tra từ tệp" : "Tạo quiz / đề kiểm tra") : "Chỉnh sửa"}</h1>
 <p id="authorNotice" role="status" aria-live="polite"></p>
 <section id="quizEditor" class="card"><div class="card-body">
-    <h2 class="h4">Quiz của tôi</h2>
+    <h2 class="h4">Soạn quiz &amp; đề kiểm tra</h2>
 <input id="quizSelect" type="hidden" value="${editId}">
 <c:if test="${importMode}">
     <div class="border rounded p-3 mb-4">
@@ -14,6 +14,14 @@
         <label for="quizCsv" class="form-label d-block">Chọn file câu hỏi và đáp án</label><input id="quizCsv" type="file" class="form-control mb-2" accept=".csv,text/csv"><button id="importQuiz" type="button" class="btn btn-outline-primary">Nhập &amp; xem trước</button>
     </div>
 </c:if>
+    <div class="border rounded p-3 mb-4">
+        <h3 class="h6">Nhập PDF / Word bằng AI</h3>
+        <p class="small">PDF hoặc DOCX tối đa 10 MB, tối đa 15 câu/lần; đề dài hãy chia tệp hoặc dùng CSV (200 câu). Chỉ trắc nghiệm 2–4 lựa chọn, một đáp án. Tệp được quét an toàn trước khi gửi AI, không lưu bản gốc. Word có hình/công thức hãy xuất PDF. Nội dung đề sẽ được gửi đến nhà cung cấp AI đã cấu hình; không tải dữ liệu cá nhân học sinh.</p>
+        <label for="quizDocument" class="form-label">Chọn tài liệu đề</label><input id="quizDocument" type="file" class="form-control mb-2" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+        <button id="importDocument" type="button" class="btn btn-outline-primary">AI tách câu hỏi &amp; xem trước</button>
+        <div id="missingAnswers" class="alert alert-warning mt-3" hidden><p id="missingAnswerText" role="status"></p><button id="generateAnswers" type="button" class="btn btn-primary btn-sm">Đồng ý tạo đáp án bằng AI</button> <button id="manualAnswers" type="button" class="btn btn-outline-secondary btn-sm">Không, tôi tự nhập đáp án</button></div>
+        <p id="documentWarnings" class="small text-break" role="status"></p>
+    </div>
     <form id="teacherQuizForm">
         <div class="row g-3">
             <div class="col-12"><label for="quizTitle" class="form-label">Tên quiz</label><input id="quizTitle" class="form-control" required maxlength="200"></div>
@@ -34,7 +42,8 @@
     <fieldset class="border rounded p-3 mb-3" data-question><legend class="h6">Câu hỏi</legend>
         <label class="form-label d-block">Nội dung<textarea data-field="content" class="form-control" rows="2" required maxlength="10000"></textarea></label>
         <div class="row g-2"><label class="col-md-6">A<input data-option class="form-control" required maxlength="1000"></label><label class="col-md-6">B<input data-option class="form-control" required maxlength="1000"></label><label class="col-md-6">C (không bắt buộc)<input data-option class="form-control" maxlength="1000"></label><label class="col-md-6">D (không bắt buộc)<input data-option class="form-control" maxlength="1000"></label></div>
-        <div class="row g-2 mt-2"><label class="col-md-6">Đáp án đúng<select data-field="correctIndex" class="form-select"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select></label><label class="col-md-6">Trọng số điểm<input data-field="points" class="form-control" type="number" min="0.01" max="9999.99" step="0.01" value="1" required></label></div>
+        <div class="row g-2 mt-2"><label class="col-md-6">Đáp án đúng<select data-field="correctIndex" class="form-select" required><option value="">Chưa có đáp án — cần chọn</option><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select></label><label class="col-md-6">Trọng số điểm<input data-field="points" class="form-control" type="number" min="0.01" max="9999.99" step="0.01" value="1" required></label></div>
+        <div data-ai-review class="alert alert-warning mt-2" hidden><p class="small">Đáp án do AI đề xuất, cần giáo viên kiểm tra trước khi lưu.</p><label><input type="checkbox" data-reviewed> Tôi đã kiểm tra và duyệt đáp án câu này</label></div>
         <label class="form-label d-block mt-2">Giải thích<textarea data-field="explanation" class="form-control" rows="2" maxlength="10000"></textarea></label>
         <div class="d-flex flex-wrap gap-2"><button data-action="up" class="btn btn-outline-primary btn-sm" type="button">↑ Lên</button><button data-action="down" class="btn btn-outline-primary btn-sm" type="button">↓ Xuống</button><button data-action="remove" class="btn btn-outline-danger btn-sm" type="button">Xóa câu</button></div>
     </fieldset>

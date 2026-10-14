@@ -35,7 +35,7 @@ public class TeacherController {
     @GetMapping("/teacher/quizzes/import")
     public String importContent(@AuthenticationPrincipal AuthenticatedUser user,Model model) {
         model.addAttribute("data",authoring.data(user));model.addAttribute("kind","quizzes");model.addAttribute("importMode",true);
-        return page(model,"teacher/quiz-form","Nhập quiz từ CSV");
+        return page(model,"teacher/quiz-form","Nhập quiz từ CSV/PDF/Word");
     }
     @GetMapping("/teacher/{kind:lessons|quizzes}/{id}")
     public String detail(@AuthenticationPrincipal AuthenticatedUser user,@PathVariable String kind,@PathVariable long id,Model model) {

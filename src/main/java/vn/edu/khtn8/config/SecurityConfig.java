@@ -83,6 +83,7 @@ public class SecurityConfig {
                             if (route.contains("/video") || route.equals("/teacher/videos")) response.setHeader("Cache-Control","private, no-store");
                             if (route.equals("/admin") || route.startsWith("/admin/")) response.setHeader("Cache-Control","private, no-store");
                             if (route.startsWith("/api/v1/admin/workspace/")) response.setHeader("Cache-Control","private, no-store");
+                            if(route.startsWith("/quizzes/") || route.startsWith("/teacher/quiz") || route.startsWith("/api/v1/quiz-attempts/") || route.startsWith("/api/v1/teacher/quiz")) response.setHeader("Cache-Control","private, no-store");
                         })
                         .contentTypeOptions(contentTypeOptions -> {})
                         .frameOptions(frame -> frame.deny()))

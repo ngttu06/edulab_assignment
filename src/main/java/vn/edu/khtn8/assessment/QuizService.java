@@ -24,13 +24,13 @@ public class QuizService {
         quizzes.lockStudent(studentId);
         quizzes.lockQuiz(quizId);
         Quiz quiz = quizzes.list(studentId).stream().filter(q -> q.id() == quizId).findFirst().orElseThrow(QuizService::notFound);
-        if("TEST".equals(quiz.mode()) && (quiz.revealAfter()==null || !Instant.now().plus(quiz.durationMinutes(),ChronoUnit.MINUTES).isBefore(quiz.revealAfter())))
-            throw new ResponseStatusException(HttpStatus.CONFLICT,"Đã quá thời điểm bắt đầu bài kiểm tra trước lịch công bố đáp án.");
         var active = quizzes.active(studentId, quizId);
         if (active.isPresent()) {
             if (!Instant.now().isBefore(active.get().deadline())) return finalizeSaved(active.get());
             return view(active.get());
         }
+        if("TEST".equals(quiz.mode()) && (quiz.revealAfter()==null || !Instant.now().plus(quiz.durationMinutes(),ChronoUnit.MINUTES).isBefore(quiz.revealAfter())))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Đã quá thời điểm bắt đầu bài kiểm tra trước lịch công bố đáp án.");
         int count = quizzes.attempts(studentId, quizId);
         if (count >= quiz.maxAttempts()) throw new ResponseStatusException(HttpStatus.CONFLICT, "Bạn đã hết lượt làm quiz này.");
         List<Question> questions = quizzes.questions(quizId);
@@ -86,14 +86,17 @@ public class QuizService {
     }
 
     static AttemptView view(Attempt attempt) {
+        return view(attempt,false);
+    }
+    static AttemptView view(Attempt attempt, boolean teacher) {
         boolean graded = attempt.status().equals("GRADED");
-        boolean reveal=graded && (!"TEST".equals(attempt.mode()) || attempt.revealAfter()!=null && !Instant.now().isBefore(attempt.revealAfter()));
+        boolean reveal=graded && (teacher || !"TEST".equals(attempt.mode()) || attempt.revealAfter()!=null && !Instant.now().isBefore(attempt.revealAfter()));
         List<QuestionView> questions = attempt.questions().stream().map(q -> new QuestionView(q.id(), q.text(),
                 reveal ? q.explanation() : null, q.points(), q.options().stream()
                 .map(o -> new OptionView(o.id(), o.text(), reveal ? o.correct() : null)).toList(),
                 attempt.answers().get(q.id()))).toList();
         return new AttemptView(attempt.id(), attempt.title(), attempt.status(), attempt.deadline(), questions,
-                graded ? attempt.score() : null, attempt.maxScore(), attempt.expired());
+                graded ? attempt.score() : null, attempt.maxScore(), attempt.expired(),attempt.mode(),attempt.revealAfter(),reveal);
     }
     private static ResponseStatusException notFound() {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy quiz hoặc lượt làm bài.");

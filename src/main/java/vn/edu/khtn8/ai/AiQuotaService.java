@@ -20,6 +20,10 @@ public class AiQuotaService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long reserve(long userId, String provider) {
+        return reserve(userId,provider,"HINT");
+    }
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public long reserve(long userId, String provider,String type) {
         jdbc.queryForObject("SELECT id FROM users WHERE id=? AND enabled=TRUE FOR UPDATE", Long.class, userId);
         if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM quiz_attempts WHERE student_id=? AND mode_snapshot='TEST' AND status='IN_PROGRESS' AND deadline_at>CURRENT_TIMESTAMP(6))",Boolean.class,userId)))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"AI tạm khóa trong khi bạn đang làm bài kiểm tra.");
@@ -28,8 +32,8 @@ public class AiQuotaService {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Đã đạt giới hạn trợ giúp AI trong 24 giờ.");
         var key = new GeneratedKeyHolder();
         jdbc.update(connection -> {
-            var statement = connection.prepareStatement("INSERT INTO ai_requests(user_id,provider,status,request_type) VALUES(?,?,'PENDING','HINT')", Statement.RETURN_GENERATED_KEYS);
-            statement.setLong(1, userId); statement.setString(2, provider); return statement;
+            var statement = connection.prepareStatement("INSERT INTO ai_requests(user_id,provider,status,request_type) VALUES(?,?,'PENDING',?)", Statement.RETURN_GENERATED_KEYS);
+            statement.setLong(1, userId); statement.setString(2, provider);statement.setString(3,type); return statement;
         }, key);
         return java.util.Objects.requireNonNull(key.getKey()).longValue();
     }

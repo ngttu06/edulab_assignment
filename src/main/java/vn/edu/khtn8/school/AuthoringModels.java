@@ -16,8 +16,13 @@ public final class AuthoringModels {
     public record QuestionInput(@NotBlank @Size(max=10000) String content,
             @NotNull @Size(max=10000) String explanation,
             @NotNull @Size(min=2,max=4) List<@NotBlank @Size(max=1000) String> options,
-            @Min(0) @Max(3) int correctIndex,
-            @NotNull @DecimalMin("0.01") @DecimalMax("9999.99") @Digits(integer=4,fraction=2) BigDecimal points) { }
+            @NotNull @Min(0) @Max(3) Integer correctIndex,
+            @NotNull @DecimalMin("0.01") @DecimalMax("9999.99") @Digits(integer=4,fraction=2) BigDecimal points,
+            boolean aiGenerated, boolean reviewed) {
+        public QuestionInput(String content,String explanation,List<String> options,Integer correctIndex,BigDecimal points) {
+            this(content,explanation,options,correctIndex,points,false,false);
+        }
+    }
     public record QuizInput(@NotBlank @Size(max=200) String title, @Min(1) @Max(600) int durationMinutes,
             @Min(1) @Max(100) int maxAttempts, @NotBlank @Pattern(regexp="PRACTICE|TEST") String mode,
             Instant revealAfter, boolean published, @NotNull @Size(min=1,max=200) List<@NotNull @Valid QuestionInput> questions,

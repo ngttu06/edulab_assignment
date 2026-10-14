@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
 class MysqlIntegrationTest {
-    @Container static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4");
+    @Container static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
+            .withCommand("--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci");
     static final Path UPLOAD_ROOT = tempRoot();
     @DynamicPropertySource static void properties(DynamicPropertyRegistry properties) {
         properties.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -48,10 +49,10 @@ class MysqlIntegrationTest {
     private AuthenticatedUser user(String username, String role) { return new AuthenticatedUser(id(username),username,username,"unused",true,0,List.of(new SimpleGrantedAuthority("ROLE_"+role))); }
 
     @Test void migrationsAndDemoPasswordMatch() {
-        assertEquals(20, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE", Integer.class));
+        assertEquals(25, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=TRUE", Integer.class));
         assertTrue(encoder.matches("ChangeMe123!", jdbc.queryForObject("SELECT password_hash FROM users WHERE username='hocsinh'", String.class)));
-        assertEquals(8, lessons.findPublishedForStudent(id("hocsinh")).size());
-        assertEquals(8L, ((Number)lessons.progressSummary(id("hocsinh")).get("total_lessons")).longValue());
+        assertEquals(53, lessons.findPublishedForStudent(id("hocsinh")).size());
+        assertEquals(53L, ((Number)lessons.progressSummary(id("hocsinh")).get("total_lessons")).longValue());
     }
     @Test @WithMockUser(roles="STUDENT") void quizSnapshotsAndSubmissionRoundTrip() {
         long student = id("hocsinh");

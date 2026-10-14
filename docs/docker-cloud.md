@@ -47,9 +47,10 @@ Docker không đóng gói/migrate dữ liệu cloud, không thay cấu hình R2/
 
 ## 2. Schema và migration
 
-Cloud `mysql.ngttu.com/edulab_assignment` hiện có **V20**, đã được validate trong
-lượt triển khai admin ngày 09/10/2026 (+07). Source hiện có V1–V20; lượt admin không
-thay schema hoặc áp dụng migration. Mỗi lần nâng schema tiếp theo cần sao lưu cloud,
+Cloud `mysql.ngttu.com/edulab_assignment` hiện có **V25** sau lượt assessment ngày
+14/10/2026: backup/restore tách biệt, diễn tập và chỉ áp dụng V25 từ V24 bằng job riêng;
+schema/dữ liệu bảng cũ được giữ nguyên. Xem kết quả và giới hạn nhập AI tại
+`/Users/ngttu/Workspace/project_asm_prj/docs/assessment.md`. Mỗi lần nâng schema tiếp theo cần sao lưu cloud,
 kiểm tra history/checksum và diễn tập staging trước khi nâng cấp. Không sửa file migration
 đã áp dụng. MySQL DDL không bảo đảm rollback nguyên transaction; backup là bắt buộc.
 
@@ -94,7 +95,8 @@ Mặc định image `edulab-khtn8:latest`, port **127.0.0.1:8088**, context **/e
 Workspace đã có image, container `edulab` được tạo sẵn với đủ biến runtime. Máy
 chưa có image hoặc source đã đổi thì thay `--no-build` bằng `--build`. Không dùng
 Docker Desktop chạy image trần mà bỏ env: nó không có secret mặc định bên trong.
-Container hiện **đang chạy healthy** với schema cloud V20. Dùng Compose để khởi
+Container hiện **healthy** với schema cloud V25; trạng thái validation mới nhất nằm ở
+mục bản assessment bên dưới. Dùng Compose để khởi
 động các lần sau, không `docker start edulab` riêng để bỏ qua kiểm tra dependency.
 Nếu build lâu/startup chậm, thêm `--wait-timeout 180`. Lần đầu cần internet tải base
 images và Maven dependencies. Build không chạy test hoặc kết nối cloud; test chạy
@@ -107,9 +109,28 @@ image không tự tải PlayerJS demo. Xem [hướng dẫn video](lesson-video-l
 MP4 và HLS đều dùng PlayerJS chính thức; nếu thiếu bundle thì cả hai báo chưa cài player.
 YouTube vẫn dùng player độc lập. Cài đặt AI có prompt riêng cho bài học/video và hỗ trợ,
 cùng nút lấy model qua Base URL + `/models`; xem [hướng dẫn AI](ai-settings.md).
-Image mới có migration V21 thêm hai cột prompt nullable, cần backup và chạy job migration
-trước app. Không thay khóa AI, provider/model hoặc hạn mức khi migrate.
+V21 thêm prompt, V22–V24 bổ sung curriculum/video và V25 bổ sung assessment.
+Cloud hiện đã áp dụng V25; những lần khởi động tiếp theo chỉ validate mặc định.
+Nếu môi trường khác còn migration pending, cần backup/review trước job migration riêng.
+Không thay khóa AI, provider/model hoặc hạn mức khi migrate.
 Không có ClamAV thì file upload tiếp tục cách ly, không tự bật scan bypass.
+
+### Bản assessment — 14/10/2026
+
+- Container `edulab` hiện chạy `edulab-khtn8:assessment-v25-20261014`, Compose pin
+  và `latest` cùng image. Docker healthy, health UP, restart count 0; job validate exit 0.
+- Cloud đã backup, restore khớp trên MySQL tách biệt và diễn tập Flyway; job chỉ
+  áp dụng V25. Dữ liệu/schema cũ được giữ, FK/CHECK TABLE đạt. Approval chỉ dùng
+  một lần; app Flyway tắt, approval persistent false, `.env.remote` không đổi.
+- 303 test Java đạt (gồm Docker/Testcontainers, không skip), 6 test Compose đạt;
+  assessment/teacher/video browser regression và GET-only live desktop/mobile đạt.
+- Giữ port `127.0.0.1:8088`, storage volume, runtime secrets/khóa, cookie Secure,
+  scan bypass false. ClamAV chưa cấu hình và PDF capability tắt: nhập tài liệu
+  bị chặn an toàn, chưa test AI/ClamAV thật; không đổi provider/model/cấu hình cloud.
+- Backup/report riêng tư:
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/assessment-v25-20261014/`.
+  Image trước được giữ nhưng thiếu V25 cho job validate; không dùng restore cloud
+  hay bỏ guard để rollback, không `down -v`.
 
 ## 4. HTTPS và reverse proxy
 

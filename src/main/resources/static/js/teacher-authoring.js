@@ -4,6 +4,7 @@
     const notice = $('authorNotice'), list = $('questionList');
     let busy = false;
     let dirty = false;
+    let importSession=null,importFingerprint='';
     document.querySelectorAll('#teacherLessonForm, #teacherQuizForm').forEach(form => {
         form.addEventListener('input', () => { dirty = true; });
         form.addEventListener('change', () => { dirty = true; });
@@ -13,19 +14,23 @@
     async function run(action) {
         if (busy) return;
         busy = true;
-        const controls = [...document.querySelectorAll('#lessonEditor button, #quizEditor button, #lessonSelect, #quizSelect')];
+        const controls = [...document.querySelectorAll('#lessonEditor button, #quizEditor button, #lessonEditor input, #quizEditor input, #lessonEditor textarea, #quizEditor textarea, #lessonEditor select, #quizEditor select, #lessonSelect, #quizSelect')];
+        const disabled=new Map(controls.map(el=>[el,el.disabled]));
         controls.forEach(el => el.disabled = true);
         try { await action(); } catch (error) { notify(error.message, true); }
-        finally { busy = false; controls.forEach(el => el.disabled = false); renumber(); }
+        finally { busy = false; controls.forEach(el => el.disabled = disabled.get(el)); renumber(); }
     }
     function classIds(name) { const ids = [...document.querySelectorAll('input[name="'+name+'"]:checked')].map(el => Number(el.value)); if (!ids.length) throw new Error('Hãy chọn ít nhất một lớp.'); return ids; }
     function setClasses(name, ids) { document.querySelectorAll('input[name="'+name+'"] ').forEach(el => el.checked = ids.includes(Number(el.value))); }
     function renumber() { if (!list) return; [...list.children].forEach((el,i) => { el.querySelector('legend').textContent = 'Câu '+(i+1); el.querySelector('[data-action="up"]').disabled = i===0; el.querySelector('[data-action="down"]').disabled = i===list.children.length-1; }); $('questionCount').textContent = '('+list.children.length+'/200)'; }
-    function addQuestion(q = {content:'', options:['',''], correctIndex:0, explanation:'', points:1}) {
+    function addQuestion(q = {content:'', options:['',''], correctIndex:null, explanation:'', points:1}) {
         if (list.children.length >= 200) throw new Error('Tối đa 200 câu hỏi.');
         const item = $('questionTemplate').content.firstElementChild.cloneNode(true);
         item.querySelectorAll('[data-field]').forEach(el => el.value = q[el.dataset.field] ?? '');
         item.querySelectorAll('[data-option]').forEach((el,i) => el.value = q.options[i] || '');
+        item.dataset.aiGenerated=q.aiGenerated?'true':'false';
+        item.querySelector('[data-ai-review]').hidden=!q.aiGenerated;
+        item.querySelector('[data-reviewed]').checked=Boolean(q.reviewed);
         list.append(item); renumber();
     }
     function questions() {
@@ -34,15 +39,20 @@
             const value = name => el.querySelector('[data-field="'+name+'"]').value;
             const options = [...el.querySelectorAll('[data-option]')].map(o => o.value.trim());
             while (options.length && !options.at(-1)) options.pop();
+            if(value('correctIndex')==='') throw new Error('Câu '+(i+1)+': chưa có đáp án. Hãy chọn đáp án trước khi lưu.');
             const correctIndex = Number(value('correctIndex'));
+            const aiGenerated=el.dataset.aiGenerated==='true',reviewed=el.querySelector('[data-reviewed]').checked;
+            if(aiGenerated && !reviewed) throw new Error('Câu '+(i+1)+': cần kiểm tra và duyệt đáp án AI.');
             if (options.some(o => !o) || correctIndex >= options.length) throw new Error('Câu '+(i+1)+': không được bỏ trống lựa chọn ở giữa hoặc chọn đáp án không có nội dung.');
-            return {content:value('content'), explanation:value('explanation'), options, correctIndex, points:Number(value('points'))};
+            return {content:value('content'), explanation:value('explanation'), options, correctIndex, points:Number(value('points')),aiGenerated,reviewed};
         });
     }
-    $('addQuestion')?.addEventListener('click', () => { try {addQuestion();} catch(e) {notify(e.message,true);} });
+    $('addQuestion')?.addEventListener('click', () => { try {addQuestion();dirty=true;} catch(e) {notify(e.message,true);} });
+    list?.addEventListener('input',event=>{const item=event.target.closest('[data-question]');if(item?.dataset.aiGenerated==='true' && !event.target.matches('[data-reviewed]')) item.querySelector('[data-reviewed]').checked=false;});
     list?.addEventListener('click', event => {
         const button = event.target.closest('[data-action]'); if (!button || busy) return;
         const item = button.closest('[data-question]');
+        dirty=true;
         if (button.dataset.action==='remove') item.remove();
         if (button.dataset.action==='up' && item.previousElementSibling) list.insertBefore(item,item.previousElementSibling);
         if (button.dataset.action==='down' && item.nextElementSibling) list.insertBefore(item.nextElementSibling,item);
@@ -55,7 +65,31 @@
         const form = new FormData(); form.append('file',file);
         const data = await api('/api/v1/teacher/quizzes/import',{method:'POST',body:form});
         list.replaceChildren(); data.forEach(addQuestion); notify('Đã đọc '+data.length+' câu. Kiểm tra và sửa bên dưới, sau đó nhấn Lưu quiz.');
+        dirty=true;importSession=null;$('missingAnswers').hidden=true;
     }));
+    function fingerprint() {return JSON.stringify([...list.children].map(el=>({fields:[...el.querySelectorAll('[data-field], [data-option]')].map(o=>o.value),reviewed:el.querySelector('[data-reviewed]').checked})));}
+    function loadDocument(data) {
+        list.replaceChildren();data.questions.forEach(addQuestion);dirty=true;
+        importSession=data.id;importFingerprint=fingerprint();
+        $('missingAnswers').hidden=!data.missingCount;
+        $('missingAnswerText').textContent='Có '+data.missingCount+' câu chưa tìm thấy đáp án. Bạn có muốn AI đề xuất đáp án cho các câu này không?';
+        $('documentWarnings').textContent=(data.warnings||[]).join('\n');
+        notify('Đã đọc '+data.questions.length+' câu. Kiểm tra đầy đủ đề và đáp án trước khi lưu. Không tự động xuất bản.');
+    }
+    $('importDocument')?.addEventListener('click',()=>run(async()=>{
+        const file=$('quizDocument').files[0];if(!file) throw new Error('Hãy chọn PDF hoặc Word DOCX.');
+        if(file.size>10*1024*1024 || !/\.(pdf|docx)$/i.test(file.name)) throw new Error('Chỉ nhận PDF/DOCX tối đa 10 MB.');
+        if([...list.children].some(el=>el.querySelector('[data-field="content"]').value.trim()) && !confirm('Thay thế câu hỏi đang soạn bằng nội dung tài liệu sau khi AI đọc thành công?')) return;
+        const form=new FormData();form.append('file',file);notify('Đang quét tệp và yêu cầu AI đọc đề…');
+        loadDocument(await api('/api/v1/teacher/quizzes/document-import',{method:'POST',body:form}));
+    }));
+    $('generateAnswers')?.addEventListener('click',()=>run(async()=>{
+        if(!importSession) throw new Error('Hãy nhập tài liệu trước.');
+        if(fingerprint()!==importFingerprint) throw new Error('Câu hỏi đã thay đổi sau khi nhập. Hãy tự chọn đáp án để không ghi đè chỉnh sửa hoặc nhập lại tệp trước khi tạo đáp án.');
+        notify('Đang đề xuất đáp án cho các câu thiếu…');
+        loadDocument(await api('/api/v1/teacher/quizzes/document-import/'+importSession+'/generate-answers',{method:'POST'}));
+    }));
+    $('manualAnswers')?.addEventListener('click',()=>{$('missingAnswers').hidden=true;notify('Đã chọn tự nhập đáp án. Các câu thiếu vẫn được đánh dấu Chưa có đáp án.');list.querySelector('[data-field="correctIndex"]:invalid')?.focus();});
     $('previewLesson')?.addEventListener('click', () => run(async () => {
         const result=await api('/api/v1/teacher/lessons/preview',{method:'POST',body:{html:$('lessonContent').value}});
         $('lessonPreviewBody').innerHTML=result.html;
@@ -95,6 +129,8 @@
         setClasses('quizClass',d.classIds);list.replaceChildren();d.questions.forEach(addQuestion);mode();notify('Đã mở quiz.');
     }));
     function mode() { if (!$('quizMode')) return; $('quizReveal').required=$('quizMode').value==='TEST' && $('quizPublished').checked; }
-    $('quizMode')?.addEventListener('change',mode);$('quizPublished')?.addEventListener('change',mode);if (list) addQuestion();mode();
+    $('quizMode')?.addEventListener('change',mode);$('quizPublished')?.addEventListener('change',mode);if (list) addQuestion();
+    if($('quizMode') && !$('quizSelect').value && new URLSearchParams(location.search).get('mode')==='TEST') {$('quizMode').value='TEST';$('quizAttempts').value='1';}
+    mode();
     for (const id of ['lessonSelect','quizSelect']) if ($(id)?.value) $(id).dispatchEvent(new Event('change'));
 })();

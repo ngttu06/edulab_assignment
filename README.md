@@ -1,7 +1,10 @@
 # EduLab KHTN 8
 
 **Deployment:** container `edulab` chỉ kết nối MySQL cloud qua TLS;
-bản nguồn này yêu cầu schema V20 (bình luận/cảm xúc). Không còn script/Compose
+bản nguồn hiện có migration đến V25 (quiz/kiểm tra, xem lại, báo cáo và nhập đề AI).
+Container assessment đã triển khai ngày 14/10/2026; cloud đã backup, diễn tập restore
+và nâng V24 → V25 bằng job riêng. Nhập PDF/DOCX còn cần ClamAV/model phù hợp. Xem
+`/Users/ngttu/Workspace/project_asm_prj/docs/assessment.md`. Không còn script/Compose
 MySQL local cho deployment hoặc fallback datasource trong profile remote.
 Hướng dẫn vận hành và hạn chế scanner ảnh tại
 `/Users/ngttu/Workspace/project_asm_prj/docs/docker-cloud.md`. Các mục ghi rõ

@@ -20,6 +20,7 @@
     <c:if test="${social}"><link href="${pageContext.request.contextPath}/css/social-community.css" rel="stylesheet"></c:if>
     <link href="${pageContext.request.contextPath}/css/motion.css" rel="stylesheet">
     <c:if test="${contentPage.startsWith('/WEB-INF/jsp/teacher/') or contentPage == '/WEB-INF/jsp/school/classes.jsp'}"><link href="${pageContext.request.contextPath}/css/teacher.css" rel="stylesheet"></c:if>
+    <c:if test="${contentPage.startsWith('/WEB-INF/jsp/quiz/') or contentPage == '/WEB-INF/jsp/teacher/quiz-report.jsp'}"><link href="${pageContext.request.contextPath}/css/assessment.css" rel="stylesheet"></c:if>
     <script src="${pageContext.request.contextPath}/js/app.js" defer></script>
     <script src="${pageContext.request.contextPath}/js/motion.js" defer></script>
     <script src="${pageContext.request.contextPath}/js/ai-chat.js" defer></script>
@@ -59,6 +60,6 @@
     <c:if test="${community}"><jsp:include page="/WEB-INF/jsp/forum/rail.jsp"/></c:if>
 </div>
 <jsp:include page="/WEB-INF/jsp/layout/footer.jsp"/>
-<c:if test="${contentPage != '/WEB-INF/jsp/lesson/video.jsp'}"><jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/></c:if>
+<c:if test="${contentPage != '/WEB-INF/jsp/lesson/video.jsp' and contentPage != '/WEB-INF/jsp/quiz/attempt.jsp'}"><jsp:include page="/WEB-INF/jsp/layout/ai-chat.jsp"/></c:if>
 </body>
 </html>

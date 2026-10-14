@@ -109,6 +109,7 @@ public class TeacherAuthoringService {
         if(id!=null) owned(user,"quizzes",id,true);
         if(input.published() && input.mode().equals("TEST") && (input.revealAfter()==null || !input.revealAfter().isAfter(Instant.now().plusSeconds(input.durationMinutes()*60L)))) throw bad("Giờ công bố đáp án phải sau thời điểm hiện tại cộng thời gian làm bài.");
         for(var q:input.questions()) if(q.correctIndex()>=q.options().size()) throw bad("Đáp án đúng không trỏ tới lựa chọn hợp lệ.");
+        if(input.questions().stream().anyMatch(q -> q.aiGenerated() && !q.reviewed())) throw bad("Giáo viên cần duyệt từng đáp án do AI đề xuất trước khi lưu.");
         var reveal=input.revealAfter()==null?null:Timestamp.from(input.revealAfter());
         if(id==null) id=insert("INSERT INTO quizzes(title,duration_minutes,max_attempts,mode,reveal_after,published,created_by,class_only) VALUES(?,?,?,?,?,?,?,TRUE)",input.title().trim(),input.durationMinutes(),input.maxAttempts(),input.mode(),reveal,input.published(),user.id());
         else {

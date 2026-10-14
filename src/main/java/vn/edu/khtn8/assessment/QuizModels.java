@@ -20,8 +20,19 @@ public final class QuizModels {
     }
     public record OptionView(long id, String text, Boolean correct) { }
     public record QuestionView(long id, String text, String explanation, BigDecimal points,
-                               List<OptionView> options, Long selectedOption) { }
+                               List<OptionView> options, Long selectedOption) {
+        public String outcome() {
+            if(options.stream().allMatch(o -> o.correct()==null)) return "HIDDEN";
+            if(selectedOption==null) return "UNANSWERED";
+            return options.stream().anyMatch(o -> o.id()==selectedOption && Boolean.TRUE.equals(o.correct())) ? "CORRECT" : "WRONG";
+        }
+    }
     public record AttemptView(long id, String title, String status, Instant deadline,
-                              List<QuestionView> questions, BigDecimal score, BigDecimal maxScore, boolean expired) { }
+                              List<QuestionView> questions, BigDecimal score, BigDecimal maxScore, boolean expired,
+                              String mode, Instant revealAfter, boolean answersVisible) {
+        public long correctCount() {return questions.stream().filter(q -> q.outcome().equals("CORRECT")).count();}
+        public long wrongCount() {return questions.stream().filter(q -> q.outcome().equals("WRONG")).count();}
+        public long unansweredCount() {return questions.stream().filter(q -> q.selectedOption()==null).count();}
+    }
     public record Submission(@NotNull @Size(max = 200) Map<Long, @NotNull Long> answers) { }
 }

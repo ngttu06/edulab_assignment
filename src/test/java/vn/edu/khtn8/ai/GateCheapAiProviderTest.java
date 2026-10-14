@@ -105,4 +105,15 @@ class GateCheapAiProviderTest {
         assertEquals(AiPrompts.LESSON,AiPrompts.effective("  ",false));
         assertEquals(AiPrompts.SUPPORT,AiPrompts.effective(null,true));
     }
+    @Test void importUsesJsonInstructionsAndRejectsTruncatedOutput() {
+        server.expect(anything()).andExpect(jsonPath("$.messages[0].content").value(org.hamcrest.Matchers.containsString("Chỉ trả JSON")))
+                .andExpect(jsonPath("$.messages[0].content").value(org.hamcrest.Matchers.containsString("không tự tạo đáp án thiếu")))
+                .andRespond(withSuccess("{\"choices\":[{\"finish_reason\":\"length\",\"message\":{\"content\":\"{\\\"questions\\\":[\"}}]}",MediaType.APPLICATION_JSON));
+        var error=assertThrows(ResponseStatusException.class,()->provider.answer(new AiProvider.AiQuestion("Trích xuất","Nội dung","QUIZ_IMPORT")));
+        assertEquals(503,error.getStatusCode().value());assertTrue(error.getReason().contains("bị cắt"));server.verify();
+    }
+    @Test void emptyImportResponseFailsWithoutNullPointer() {
+        server.expect(anything()).andRespond(withSuccess("",MediaType.APPLICATION_JSON));
+        assertEquals(503,assertThrows(ResponseStatusException.class,()->provider.answer(new AiProvider.AiQuestion("Trích xuất","Nội dung","QUIZ_IMPORT"))).getStatusCode().value());server.verify();
+    }
 }

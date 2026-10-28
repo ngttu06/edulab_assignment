@@ -116,4 +116,62 @@ public class AssignmentService {
         jdbc.update("UPDATE teacher_feedback SET deleted_at=CURRENT_TIMESTAMP(6) WHERE id=?",id);
         school.audit(user,"DELETE_FEEDBACK","feedback",id);
     }
+
+    public List<vn.edu.khtn8.content.dto.AssignmentSummary> studentAssignments(long studentId, String status, Long courseId) {
+        var sql = new StringBuilder("""
+            SELECT a.id assignment_id, a.quiz_id, q.title, c.name class_name, a.due_at,
+                   co.title course_name, co.id course_id,
+                   EXISTS(SELECT 1 FROM quiz_attempts x WHERE x.student_id=? AND x.quiz_id=a.quiz_id
+                          AND x.status='GRADED' AND x.submitted_at>=a.created_at AND x.submitted_at<=a.due_at) completed,
+                   a.due_at<CURRENT_TIMESTAMP(6) overdue,
+                   (SELECT MAX(x.score) FROM quiz_attempts x WHERE x.student_id=? AND x.quiz_id=a.quiz_id
+                    AND x.status='GRADED' AND x.submitted_at>=a.created_at AND x.submitted_at<=a.due_at) score,
+                   (SELECT MAX(x.submitted_at) FROM quiz_attempts x WHERE x.student_id=? AND x.quiz_id=a.quiz_id
+                    AND x.status='GRADED' AND x.submitted_at>=a.created_at AND x.submitted_at<=a.due_at) submitted_at
+            FROM class_assignments a
+            JOIN quizzes q ON q.id=a.quiz_id
+            JOIN classrooms c ON c.id=a.classroom_id
+            LEFT JOIN courses co ON co.id=q.course_id
+            JOIN class_enrollments e ON e.classroom_id=c.id AND e.student_id=? AND e.active=TRUE
+            WHERE a.cancelled_at IS NULL AND c.archived_at IS NULL
+            """);
+
+        var params = new java.util.ArrayList<>();
+        params.add(studentId);
+        params.add(studentId);
+        params.add(studentId);
+        params.add(studentId);
+
+        if (courseId != null) {
+            sql.append(" AND co.id=?");
+            params.add(courseId);
+        }
+
+        sql.append(" ORDER BY a.due_at DESC LIMIT 100");
+
+        return jdbc.query(sql.toString(), (rs, n) -> {
+            boolean completed = rs.getBoolean("completed");
+            boolean overdue = rs.getBoolean("overdue");
+            String assignmentStatus = completed ? "completed" : (overdue ? "overdue" : "todo");
+
+            // Filter by status if specified
+            if (status != null && !status.equals("all") && !status.equals(assignmentStatus)) {
+                return null;
+            }
+
+            return new vn.edu.khtn8.content.dto.AssignmentSummary(
+                rs.getLong("assignment_id"),
+                rs.getLong("quiz_id"),
+                rs.getString("title"),
+                rs.getString("course_name") != null ? rs.getString("course_name") : "Không rõ khóa học",
+                rs.getString("class_name"),
+                rs.getTimestamp("due_at").toInstant(),
+                completed,
+                overdue,
+                assignmentStatus,
+                rs.getObject("score") != null ? ((Number)rs.getObject("score")).intValue() : null,
+                rs.getTimestamp("submitted_at") != null ? rs.getTimestamp("submitted_at").toInstant() : null
+            );
+        }, params.toArray()).stream().filter(java.util.Objects::nonNull).toList();
+    }
 }

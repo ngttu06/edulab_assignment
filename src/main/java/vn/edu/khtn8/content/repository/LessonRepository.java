@@ -80,4 +80,112 @@ public class LessonRepository {
                   AND EXISTS (SELECT 1 FROM lesson_versions v WHERE v.lesson_id = l.id AND v.status = 'PUBLISHED')
                 """ + " AND " + vn.edu.khtn8.school.ContentAccess.lesson("l",studentId), studentId);
     }
+
+    public vn.edu.khtn8.content.dto.CourseStructure courseStructure(long studentId, long courseId) {
+        // Get course info
+        var courseInfo = jdbc.queryForMap("""
+            SELECT c.id, c.title, s.name subject_name, s.grade_level,
+                   COUNT(DISTINCT l.id) total_lessons,
+                   COALESCE(SUM(CASE WHEN p.status = 'COMPLETED' THEN 1 ELSE 0 END), 0) completed_lessons,
+                   COALESCE(ROUND(AVG(COALESCE(p.completion_percent, 0))), 0) completion_percent
+            FROM courses c
+            JOIN subjects s ON s.id = c.subject_id
+            JOIN topics t ON t.course_id = c.id
+            JOIN lessons l ON l.topic_id = t.id AND l.status = 'PUBLISHED'
+            LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.student_id = ?
+            WHERE c.id = ?
+            GROUP BY c.id, c.title, s.name, s.grade_level
+            """, studentId, courseId);
+
+        // Get topics with lessons
+        var topics = jdbc.query("""
+            SELECT t.id topic_id, t.name topic_name, t.display_order,
+                   COUNT(l.id) total_count,
+                   COALESCE(SUM(CASE WHEN p.status = 'COMPLETED' THEN 1 ELSE 0 END), 0) completed_count
+            FROM topics t
+            LEFT JOIN lessons l ON l.topic_id = t.id AND l.status = 'PUBLISHED'
+            LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.student_id = ?
+            WHERE t.course_id = ?
+            GROUP BY t.id, t.name, t.display_order
+            ORDER BY t.display_order, t.id
+            """, (rs, n) -> {
+                long topicId = rs.getLong("topic_id");
+                String topicName = rs.getString("topic_name");
+                int displayOrder = rs.getInt("display_order");
+                int totalCount = rs.getInt("total_count");
+                int completedCount = rs.getInt("completed_count");
+
+                // Get lessons for this topic
+                var lessons = jdbc.query("""
+                    SELECT l.id, l.title, l.duration_minutes, l.video_id, l.prerequisite_id,
+                           COALESCE(p.completion_percent, 0) completion_percent,
+                           COALESCE(p.status, 'NOT_STARTED') status
+                    FROM lessons l
+                    LEFT JOIN lesson_progress p ON p.lesson_id = l.id AND p.student_id = ?
+                    WHERE l.topic_id = ? AND l.status = 'PUBLISHED'
+                    ORDER BY l.display_order, l.id
+                    """, (lrs, ln) -> {
+                        long lessonId = lrs.getLong("id");
+                        String title = lrs.getString("title");
+                        int duration = lrs.getInt("duration_minutes");
+                        boolean hasVideo = lrs.getObject("video_id") != null;
+                        Long prereqId = lrs.getObject("prerequisite_id", Long.class);
+                        int completion = lrs.getInt("completion_percent");
+                        String status = lrs.getString("status");
+
+                        // Determine if locked (simplified - should check prerequisites properly)
+                        boolean isLocked = false;
+                        String lessonStatus = completion == 100 ? "completed"
+                                            : completion > 0 ? "in_progress"
+                                            : isLocked ? "locked" : "available";
+
+                        return new vn.edu.khtn8.content.dto.CourseStructure.LessonItem(
+                            lessonId, title, duration, completion, hasVideo, false,
+                            isLocked, prereqId, lessonStatus
+                        );
+                    }, studentId, topicId);
+
+                return new vn.edu.khtn8.content.dto.CourseStructure.TopicModule(
+                    topicId, topicName, displayOrder, completedCount, totalCount, lessons
+                );
+            }, studentId, courseId);
+
+        return new vn.edu.khtn8.content.dto.CourseStructure(
+            ((Number)courseInfo.get("id")).longValue(),
+            (String)courseInfo.get("title"),
+            (String)courseInfo.get("subject_name"),
+            ((Number)courseInfo.get("grade_level")).intValue(),
+            ((Number)courseInfo.get("completion_percent")).intValue(),
+            ((Number)courseInfo.get("completed_lessons")).intValue(),
+            ((Number)courseInfo.get("total_lessons")).intValue(),
+            topics
+        );
+    }
+
+    public vn.edu.khtn8.content.dto.LessonNavigation lessonNavigation(long studentId, long courseId, long lessonId) {
+        var lessons = jdbc.query("""
+            SELECT l.id, l.title
+            FROM lessons l
+            JOIN topics t ON t.id = l.topic_id
+            WHERE t.course_id = ? AND l.status = 'PUBLISHED'
+            ORDER BY t.display_order, l.display_order, l.id
+            """, (rs, n) -> Map.of("id", rs.getLong("id"), "title", rs.getString("title")), courseId);
+
+        int currentIndex = -1;
+        for (int i = 0; i < lessons.size(); i++) {
+            if (((Number)lessons.get(i).get("id")).longValue() == lessonId) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        Long prevId = currentIndex > 0 ? ((Number)lessons.get(currentIndex - 1).get("id")).longValue() : null;
+        String prevTitle = currentIndex > 0 ? (String)lessons.get(currentIndex - 1).get("title") : null;
+        Long nextId = currentIndex < lessons.size() - 1 ? ((Number)lessons.get(currentIndex + 1).get("id")).longValue() : null;
+        String nextTitle = currentIndex < lessons.size() - 1 ? (String)lessons.get(currentIndex + 1).get("title") : null;
+
+        return new vn.edu.khtn8.content.dto.LessonNavigation(
+            prevId, prevTitle, nextId, nextTitle, currentIndex + 1, lessons.size()
+        );
+    }
 }

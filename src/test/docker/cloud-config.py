@@ -30,6 +30,9 @@ class CloudComposeTest(unittest.TestCase):
         self.env = {key: value for key, value in os.environ.items()
                     if not key.startswith(("EDULAB_", "COMPOSE_"))}
         self.env["EDULAB_ENV_FILE"] = str(self.env_file)
+        # Do not let a real deployment's .env image/port pins alter fixture tests.
+        self.env["COMPOSE_DISABLE_ENV_FILE"] = "true"
+        self.env["EDULAB_IMAGE"] = ""
 
     def config(self, file="docker-compose.yml"):
         result = subprocess.run(
@@ -60,6 +63,14 @@ class CloudComposeTest(unittest.TestCase):
                 self.assertEqual(env["SPRING_FLYWAY_ENABLED"], "false")
                 self.assertEqual(env["EDULAB_COOKIE_SECURE"], "true")
                 self.assertEqual(env["EDULAB_DEV_SCAN_BYPASS"], "false")
+
+    def test_explicit_image_pin_is_shared_by_app_and_migration(self):
+        self.env["EDULAB_IMAGE"] = "edulab-khtn8:fixture-release"
+        for file in ["docker-compose.yml", "compose.cloud.yml"]:
+            with self.subTest(file=file):
+                config = self.config(file)
+                self.assertTrue(all(service["image"] == "edulab-khtn8:fixture-release"
+                                    for service in config["services"].values()))
 
     def test_runtime_secrets_are_forwarded_from_env_file(self):
         env = self.config()["services"]["app"]["environment"]

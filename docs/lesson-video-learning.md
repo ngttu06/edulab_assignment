@@ -237,14 +237,14 @@ preview lặp, bản thiếu asset và lỗi manifest HTTP 403 qua API HLS thậ
 player/time bằng mock. CORS CDN thực tế vẫn cần kiểm tra trên nguồn sẽ triển khai.
 
 `video-mp4-ui.cjs` tạo MP4/H.264 offline bằng MediaRecorder của Chrome rồi kiểm decode
-và phát/tua/pause/khôi phục mốc thật qua native video (không giả clock/player); ghi tiến độ,
+và phát/tua/pause/khôi phục mốc thật qua **PlayerJS chính thức** (không giả clock/player); ghi tiến độ,
 fullscreen, JPEG/timestamp AI, toggle giữ state, preview quản lý điền thời lượng và cleanup,
 responsive và lỗi CORS không phù hợp. Yêu cầu Chrome hỗ trợ ghi MP4/H.264. Không gọi nguồn, app,
 database hoặc model thật; endpoint được intercept. Unit/MVC tests kiểm URL mọi domain
 với cấu hình trống/`*`, allowlist cụ thể, MP4, HTTPS/URL an toàn, CSRF/quyền và CSP theo route.
 
-Lượt mở domain và thêm MP4: Maven verify/WAR build đạt với **201 test không-database**;
-browser regression HLS/YouTube 8 độ rộng và browser native MP4/H.264 đạt. Đã build
+Lịch sử lượt mở domain và thêm MP4 (trước khi đổi MP4 sang PlayerJS): Maven verify/WAR
+build đạt với **201 test không-database**; browser HLS/YouTube 8 độ rộng và native MP4/H.264 đạt. Đã build
 image và redeploy riêng service `app` ngày 09/10/2026 theo yêu cầu chủ sở hữu; xem dưới.
 
 Lần tinh chỉnh player-only: đã chạy 198 test không-database + WAR build và browser
@@ -252,9 +252,25 @@ regression ở 320/390/640/768/1024/1280/1440/1920 px. Ảnh kiểm UI nằm tro
 `target/video-ui-screenshots`; không gọi app/cloud/AI thật. Nguồn lesson 1, PlayerJS build
 và CORS HLS thực tế chưa xác minh; không suy ra từ thành công của các fixture offline.
 
-### Redeploy container ngày 09/10/2026 — player-only, mọi domain HTTPS và MP4
+### Bản hiện tại — PlayerJS MP4/HLS và AI settings, 09/10/2026
 
-- Image đang chạy: `edulab-khtn8:video-mp4-20261009T012318Z`; `latest` trỏ cùng image.
+- Image `edulab-khtn8:playerjs-ai-20261009T035753Z` đang healthy trên cổng 8088;
+  `app`/`migrate` dùng chung image pin. V21 chỉ thêm hai cột prompt nullable sau
+  backup/restore/rehearsal, dữ liệu gốc và volume được bảo toàn.
+- MP4 và HLS đều dùng bundle PlayerJS 22.0.7 nguyên bản, với `tagcors:1` đặt CORS
+  trước nguồn; YouTube vẫn độc lập. MP4 không còn dùng adapter native riêng.
+- 214 test không DB, 7 MySQL test AI/video và browser offline MP4/HLS/YouTube-AI/admin
+  AI đạt. Đã thử nguồn MP4 hiện có qua harness chỉ đọc với JS từ container: metadata,
+  play/pause/seek và JPEG CORS đạt; không tạo phiên học/ghi progress.
+- Public pages/health và served assets đạt. Credential smoke admin cũ bị 401, nên
+  chưa kiểm cloud prompt save/model discovery qua login hiện tại. Không đổi tài khoản,
+  không gọi AI chat, chưa xác minh vision/Safari/native HLS/YouTube live.
+- Xem [record triển khai và rollback](docker-cloud.md#bản-playerjs--ai-settings--09102026)
+  và [hướng dẫn prompt/model](ai-settings.md).
+
+### Lịch sử redeploy ngày 09/10/2026 — player-only, mọi domain HTTPS và MP4
+
+- Image ở lần triển khai này: `edulab-khtn8:video-mp4-20261009T012318Z`; khi đó `latest` trỏ cùng image.
   Container `edulab`, cổng `127.0.0.1:8088`, context `/edulab`.
 - Chỉ `app` được recreate bằng `up -d --no-build --no-deps --wait --wait-timeout 180 app`.
   Không chạy lại `migrate`; Flyway vẫn tắt. Đối chiếu migration trong WAR mới với image
@@ -277,7 +293,8 @@ EDULAB_IMAGE=edulab-khtn8:before-video-mp4-20261009T012318Z \
   up -d --no-build --no-deps --wait --wait-timeout 180 app
 ```
 
-Nếu rollback, giữ `EDULAB_IMAGE` cho lần chạy sau; `latest` hiện trỏ bản MP4 mới.
+Ở lần triển khai lịch sử này, `latest` trỏ bản MP4 tương ứng. Khi rollback, giữ
+`EDULAB_IMAGE` cho lần chạy sau; bản hiện tại và image pin ở mục bên trên.
 
 ### Lịch sử triển khai trước lần tinh chỉnh player-only
 

@@ -27,10 +27,14 @@ public class QuizController {
     }
     @GetMapping("/quizzes/attempts/{id}")
     public String attempt(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, Model model) {
-        model.addAttribute("attempt", service.get(user.id(), id));
-        model.addAttribute("pageTitle", "Làm quiz · EduLab");
-        model.addAttribute("contentPage", "/WEB-INF/jsp/quiz/attempt.jsp");
-        return "layout/default";
+        AttemptView attempt = service.get(user.id(), id);
+        // A quiz in progress opens in a distraction-free workspace; a graded attempt
+        // falls back to the regular shell so the answer review keeps navigation.
+        boolean taking = "IN_PROGRESS".equals(attempt.status());
+        model.addAttribute("attempt", attempt);
+        model.addAttribute("pageTitle", taking ? "Làm quiz · EduLab" : "Xem lại bài làm · EduLab");
+        model.addAttribute("contentPage", taking ? "/WEB-INF/jsp/quiz/take.jsp" : "/WEB-INF/jsp/quiz/attempt.jsp");
+        return taking ? "layout/focus" : "layout/default";
     }
     @GetMapping("/api/v1/quizzes") @ResponseBody
     public List<Quiz> apiList(@AuthenticationPrincipal AuthenticatedUser user,@ModelAttribute vn.edu.khtn8.content.dto.CatalogFilter filter) {

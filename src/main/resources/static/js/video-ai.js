@@ -134,6 +134,9 @@
         busy = true; controls(); suggestions.hidden = true;
         const frame = selectedFrame, currentPosition = position();
         const bubble = message('user', question, frame);
+        // Clear the composer immediately so the submitted question/frame is not shown twice while AI responds.
+        input.value = '';
+        selectFrame(undefined);
         status.textContent = frame ? 'AI đang đọc khung hình và chuẩn bị câu trả lời…' : 'AI đang trả lời theo nội dung bài học (chưa có khung hình)…';
         try {
             const answer = await window.edulab.api('/api/v1/lessons/' + root.dataset.lesson + '/video/chat', {
@@ -143,11 +146,15 @@
             history.push({role:'user', content:(question + (frame ? '\n[Khung hình tại ' + time(frame.timestampMs) + ']' : '')).slice(0,2000)},
                 {role:'assistant', content:answer.text.slice(0,2000)});
             history = history.slice(-8);
-            if (input.value.trim() === question) input.value = '';
-            selectFrame(undefined);
             status.textContent = answer.frameAnalyzed ? 'Đã gửi khung hình tại ' + time(answer.positionMs) + ' cho AI. Cần kiểm chứng câu trả lời.' : 'Trả lời theo bài học; không có khung hình được gửi.';
         } catch (error) {
-            bubble.remove(); status.textContent = error.message; // Keep question/frame for an explicit retry, never auto-retry a billed call.
+            bubble.remove();
+            // Keep explicit retry behavior without overwriting a new draft typed while the request was pending.
+            if (!input.value) {
+                input.value = question;
+                if (frame) selectFrame(frame);
+            }
+            status.textContent = error.message;
         } finally { busy = false; controls(); }
     });
     input.addEventListener('keydown', event => {

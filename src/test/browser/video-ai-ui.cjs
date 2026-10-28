@@ -40,7 +40,7 @@ async function main() {
     let crossOriginVideo;
     async function open(width,height=960,source='hls') {
         const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce',serviceWorkers:'block'});
-        let failAi=false,aiDelay=0;
+        let failAi=false,aiDelay=0,aiGate;
         await context.addInitScript(()=>{
             window.__forbiddenCaptureCalls=[];
             for(const name of ['getDisplayMedia','setCaptureHandleConfig'])
@@ -64,6 +64,7 @@ async function main() {
                 if(pathname.endsWith('/video/sessions')) return route.fulfill({json:{sessionId:'fixture-session',progress}});
                 if(pathname.endsWith('/video/progress')) return route.fulfill({json:progress});
                 if(pathname.endsWith('/video/chat')) {
+                    if(aiGate) await aiGate;
                     if(aiDelay) await new Promise(resolve=>setTimeout(resolve,aiDelay));
                     return route.fulfill(failAi ? {status:503,json:{message:'AI đang bận. Hãy thử lại.'}} : {json:{text:'Chất phản ứng biến đổi thành sản phẩm. <img src=x onerror=alert(1)>',sample:false,frameAnalyzed:!!body.frame,positionMs:body.frame?.timestampMs ?? body.positionMs,sourceLabels:['Bài học'],needsTeacherReview:true}});
                 }
@@ -77,10 +78,13 @@ async function main() {
         const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(7000);
         await page.goto(origin+'/edulab/lessons/1/video');
         await page.waitForFunction(()=>!document.getElementById('videoPlay').disabled);await page.evaluate(()=>document.fonts.ready);
-        return {context,page,fail:value=>{failAi=value;},delay:value=>{aiDelay=value;}};
+        return {context,page,fail:value=>{failAi=value;},delay:value=>{aiDelay=value;},hold:()=>{
+            let release;aiGate=new Promise(resolve=>{release=resolve;});
+            return ()=>{aiGate=undefined;release();};
+        }};
     }
     try {
-        const {page,context,fail,delay}=await open(1440);
+        const {page,context,fail,delay,hold}=await open(1440);
         assert.equal(await page.locator('#aiChatToggle').count(),0);
         const left=await page.locator('#videoLearning').boundingBox(),right=await page.locator('#videoAi').boundingBox();
         assert.ok(right.x>=left.x+left.width,'Desktop AI is on the right');
@@ -171,12 +175,29 @@ async function main() {
         await page.locator('#videoSeek').evaluate(el=>{el.value='300';el.dispatchEvent(new Event('input',{bubbles:true}));});
         assert.equal(await page.locator('#videoAiFrameTime').innerText(),frameTime,'Seeking does not change the selected image timestamp');
         await page.locator('#videoAiQuestion').fill('Giải thích khung hình này');
-        await page.locator('#videoAiSend').click();await page.waitForFunction(()=>!document.getElementById('videoAiSend').disabled);
+        const releaseFirst=hold();await page.locator('#videoAiSend').click();
+        assert.equal(await page.locator('#videoAiQuestion').inputValue(),'','Submitted question is removed from the composer immediately');
+        assert.equal(await page.locator('#videoAiPreview').isVisible(),false,'Submitted frame is removed from the composer immediately');
+        assert.equal(await page.locator('#videoAiPreviewImage').getAttribute('src'),null,'Composer releases the submitted image');
+        assert.equal(await page.locator('#videoAiSend').isDisabled(),true,'Sending stays locked while the request is pending');
+        assert.equal(await page.locator('#videoAiForm').getAttribute('aria-busy'),'true');
+        assert.equal(await page.locator('#videoAiMessages .user').count(),1,'Submitted question appears only once');
+        assert.equal(await page.locator('#videoAiMessages .user p').innerText(),'Giải thích khung hình này');
+        assert.equal(await page.locator('#videoAiMessages .user img').getAttribute('src'),previewSrc,'Message retains the submitted image');
+        assert.equal(await page.locator('#videoAiMessages .user small').innerText(),frameTime,'Message retains the captured timestamp');
+        await page.screenshot({path:path.join(screenshots,'composer-reset-pending.png'),fullPage:true});
+        await page.locator('#videoAiQuestion').fill('Giải thích thêm');
+        await page.locator('#videoAiQuestion').press('Enter');
+        assert.equal(await page.locator('#videoAiMessages .user').count(),1,'Enter while busy does not submit a second message');
+        releaseFirst();await page.waitForFunction(()=>!document.getElementById('videoAiSend').disabled);
         const first=calls.filter(call=>call.path.endsWith('/chat')).at(-1).body;
         assert.ok(first.frame.dataUrl.startsWith('data:image/jpeg;base64,'));assert.equal(first.frame.timestampMs,capturedTimestamp);assert.equal(first.positionMs,300000);assert.equal(first.videoId,2);
         assert.equal(await page.locator('#videoAiMessages .assistant img').count(),0,'AI output is text, not injected HTML');
         assert.equal(await page.locator('#videoAiPreview').isVisible(),false);
-        await page.locator('#videoAiQuestion').fill('Giải thích thêm');await page.locator('#videoAiQuestion').press('Enter');
+        assert.equal(await page.locator('#videoAiQuestion').inputValue(),'Giải thích thêm','AI response does not clear the next draft');
+        const releaseSecond=hold();await page.locator('#videoAiQuestion').press('Enter');
+        assert.equal(await page.locator('#videoAiQuestion').inputValue(),'','Text-only submission resets the composer too');
+        releaseSecond();
         await page.waitForFunction(()=>!document.getElementById('videoAiSend').disabled);
         const second=calls.filter(call=>call.path.endsWith('/chat')).at(-1).body;assert.equal(second.frame,null);assert.equal(second.history.length,2);
         assert.ok((await page.locator('#videoAiStatus').innerText()).includes('không có khung hình'));
@@ -187,15 +208,34 @@ async function main() {
         const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=20;c.height=10;c.getContext('2d').fillRect(0,0,20,10);return c.toDataURL('image/png').split(',')[1];});
         await page.locator('#videoAiImage').setInputFiles({name:'frame.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
         await page.locator('#videoAiPreview').waitFor({state:'visible'});
-        fail(true);await page.locator('#videoAiQuestion').fill('Giữ lại khi lỗi');await page.locator('#videoAiSend').click();
+        const manualFrame=await page.locator('#videoAiPreviewImage').getAttribute('src'),manualTime=await page.locator('#videoAiFrameTime').innerText();
+        fail(true);const releaseFailed=hold();await page.locator('#videoAiQuestion').fill('Giữ lại khi lỗi');await page.locator('#videoAiSend').click();
+        assert.equal(await page.locator('#videoAiQuestion').inputValue(),'');assert.equal(await page.locator('#videoAiPreview').isVisible(),false);
+        releaseFailed();
         await page.waitForFunction(()=>!document.getElementById('videoAiSend').disabled);
         assert.equal(await page.locator('#videoAiQuestion').inputValue(),'Giữ lại khi lỗi');assert.equal(await page.locator('#videoAiPreview').isVisible(),true);
+        assert.equal(await page.locator('#videoAiPreviewImage').getAttribute('src'),manualFrame,'Retry restores the exact image');
+        assert.equal(await page.locator('#videoAiFrameTime').innerText(),manualTime,'Retry restores the exact timestamp');
+        assert.equal(await page.locator('#videoAiMessages .user').count(),2,'Failed submission is not duplicated in the conversation');
         assert.match(await page.locator('#videoAiStatus').innerText(),/AI đang bận/);
         fail(false);delay(500);await page.locator('#videoAiSend').click();
         await page.locator('#videoAiToggle').click();
         await page.waitForFunction(()=>!document.getElementById('videoAiSend').disabled);
         await page.locator('#videoAiToggle').click();delay(0);
         assert.equal(await page.locator('#videoAiMessages .assistant').count(),4,'In-flight answer completes even while AI is hidden');
+        const retried=calls.filter(call=>call.path.endsWith('/chat')).at(-1).body;
+        assert.equal(retried.frame.dataUrl,manualFrame);assert.equal(retried.question,'Giữ lại khi lỗi');
+        assert.equal(await page.locator('#videoAiQuestion').inputValue(),'');assert.equal(await page.locator('#videoAiPreview').isVisible(),false);
+        // A failed request must not pair its old frame with a new question drafted while waiting.
+        await page.locator('#videoAiImage').setInputFiles({name:'frame.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+        await page.locator('#videoAiPreview').waitFor({state:'visible'});
+        fail(true);const releaseDraftFailure=hold();
+        await page.locator('#videoAiQuestion').fill('Câu hỏi gặp lỗi');await page.locator('#videoAiSend').click();
+        await page.locator('#videoAiQuestion').fill('Bản nháp mới không bị ghi đè');
+        releaseDraftFailure();await page.waitForFunction(()=>!document.getElementById('videoAiSend').disabled);fail(false);
+        assert.equal(await page.locator('#videoAiQuestion').inputValue(),'Bản nháp mới không bị ghi đè');
+        assert.equal(await page.locator('#videoAiPreview').isVisible(),false,'Failed frame is not attached to a different draft');
+        assert.equal(await page.locator('#videoAiMessages .user').count(),3);
         await page.locator('#videoAiReset').click();assert.equal(await page.locator('#videoAiMessages > div').count(),1);
         // A pending seek must settle before the direct frame is read.
         await page.evaluate(()=>{
@@ -286,7 +326,7 @@ async function main() {
         await youtube.context.close();
         assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
         assert.doesNotMatch(fs.readFileSync(path.join(assets,'js/video-ai.js'),'utf8'),/getDisplayMedia|setCaptureHandleConfig|getCaptureHandle/);
-        console.log('PASS: real JSP/JS/CSS; PlayerJS + YouTube adapters; 8 responsive widths; keyboard AI toggle preserves player/draft/preview/history/in-flight replies; compact controls + fullscreen/button/external exit + watched reporting; direct video JPEG pixels exclude player overlay, timestamp preserved after seek; simulated and real browser cross-origin canvas rejection (offline WebM), missing media, seek readiness/timeout, honest YouTube limitation; no browser capture API calls; CSRF/manual image/retry/reset/bounded history. Offline fixtures, not actual HLS decoding/CDN or live AI.');
+        console.log('PASS: real JSP/JS/CSS; PlayerJS + YouTube adapters; 8 responsive widths; keyboard AI toggle preserves player/draft/preview/history/in-flight replies; compact controls + fullscreen/button/external exit + watched reporting; direct video JPEG pixels exclude player overlay, timestamp preserved after seek; simulated and real browser cross-origin canvas rejection (offline WebM), missing media, seek readiness/timeout, honest YouTube limitation; no browser capture API calls; immediate composer reset preserves sent images/timestamps/new drafts, restores failed submissions for retry without overwriting new drafts; CSRF/manual image/retry/reset/bounded history. Offline fixtures, not actual HLS decoding/CDN or live AI.');
     } finally { await browser.close(); }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

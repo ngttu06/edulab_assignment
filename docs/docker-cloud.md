@@ -115,6 +115,102 @@ Nếu môi trường khác còn migration pending, cần backup/review trước 
 Không thay khóa AI, provider/model hoặc hạn mức khi migrate.
 Không có ClamAV thì file upload tiếp tục cách ly, không tự bật scan bypass.
 
+### Bản PlayerJS + AI settings — 09/10/2026
+
+- Image trong lượt triển khai này: `edulab-khtn8:playerjs-ai-20261009T035753Z`, container `edulab`,
+  health `UP` tại `http://127.0.0.1:8088/edulab/actuator/health`.
+  `/Users/ngttu/Workspace/project_asm_prj/.env` ghim `EDULAB_IMAGE` cho cả `app` và
+  `migrate`; `latest` cũng trỏ image này. File ghim không chứa secret.
+- Đã backup schema/dữ liệu được tài khoản cloud phép đọc, kiểm SHA-256, khôi phục
+  52 bảng vào MySQL cô lập và rehearsal V21. Không backup toàn MySQL server/event definitions.
+  Migration riêng áp dụng đúng V21 **trước** recreate app; đối chiếu các cột gốc,
+  số dòng/hash, khóa ngoại và `CHECK TABLE` đạt trước khi chạy web.
+- Giữ nguyên runtime env/secrets, API key/provider/model/quotas, port và volume
+  `edulab_app-storage`. Hai prompt mới NULL dùng mặc định. Không clean/repair/baseline,
+  không import dữ liệu vào cloud, không `down -v`. Approval thường trực vẫn `false`.
+- Backup/report riêng tư tại
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/cloud-db-backups/v21-20261009T042516Z/`.
+- Kiểm tra: 214 test Java không DB và WAR build; 7 test MySQL loopback cho AI settings/video;
+  browser offline MP4/HLS/YouTube-AI/admin AI đạt. Public pages/health desktop/mobile
+  và assets đang phục vụ khớp source. MP4 lesson thực tế được thử trong harness chỉ đọc
+  bằng JS đang phục vụ: metadata/play/pause/seek/JPEG CORS đạt, không ghi progress.
+- **Giới hạn:** smoke đăng nhập admin bằng credential cũ trả 401; không thay mật khẩu/tài khoản.
+  Prompt save/reset được kiểm ở DB thử và browser offline, chưa kiểm qua admin cloud.
+  `/v1/models` live qua admin chưa kiểm được; dùng login hiện tại để bấm lấy model.
+  Không gọi AI chat/completion, chưa chứng minh model vision, Safari/native HLS hoặc YouTube live.
+
+Rollback **chỉ ứng dụng** bằng image trước đó, giữ nguyên schema V21/volume:
+
+```bash
+EDULAB_IMAGE=edulab-khtn8:playerjs-20261009T025502Z \
+  docker compose -f /Users/ngttu/Workspace/project_asm_prj/docker-compose.yml \
+  up -d --no-build --no-deps --wait --wait-timeout 180 app
+```
+
+Nếu rollback, cập nhật cả image pin trong `.env` cho lần Compose sau; không restore DB
+chỉ để rollback app. Schema V21 additive vẫn tương thích image cũ.
+
+### Bản reset video AI — triển khai 09/10, kiểm tra lại 12/10/2026
+
+- Image trong lượt triển khai này: `edulab-khtn8:video-ai-reset-20261009T050227Z`, container `edulab`,
+  bind `127.0.0.1:8088`, context `/edulab`. `.env` ghim image này cho cả `app` và
+  `migrate`; tag `latest` cũng trỏ cùng image. Image trước đó
+  `edulab-khtn8:playerjs-ai-20261009T035753Z` vẫn được giữ, không xóa.
+- Câu hỏi và preview được xóa ngay sau gửi; ảnh/mốc thời gian vẫn nằm trong tin nhắn.
+  Không xóa bản nháp mới khi AI trả lời; lỗi gửi chỉ khôi phục khi ô nhập trống,
+  không tự retry lời gọi AI tính phí. JavaScript trong image và đang phục vụ khớp
+  byte với `/Users/ngttu/Workspace/project_asm_prj/src/main/resources/static/js/video-ai.js`.
+- Lượt deploy 09/10: 21 migration không đổi so với image cũ, job validate thành công,
+  Compose `--wait` đạt. Không chạy migration, repair, clean, baseline hoặc import DB.
+  214 test Java không DB, AI UI/MP4 browser regression và 6 test Compose đạt.
+- Kiểm tra lại 12/10: Docker Desktop đã dừng; khởi động lại Desktop khôi phục đúng
+  container/image. Docker `healthy`, health `UP`, không restart vòng lặp; runtime
+  environment, `.env.remote`, user, ports và volume `edulab_app-storage` không đổi.
+  Browser chỉ GET trang chủ/khóa học/login/register ở 1440/390 px: HTTP 200,
+  không overflow, không lỗi JavaScript hoặc resource nội bộ.
+- **Cảnh báo schema trước rebuild ngày 12/10:** cloud ở V24 trong khi image cũ chỉ có V1–V21.
+  Job validate chạy lại exit 1; chẩn đoán chỉ đọc xác nhận
+  `APPLIED_VERSIONED_MIGRATION_NOT_RESOLVED` cho V22, V23, V24; pending bằng 0.
+  Container đã tự chạy lại và vẫn healthy, nhưng **lệnh Compose không đạt validation**.
+  Health UP/public smoke không chứng minh tương thích đầy đủ với V24.
+  Kiểm tra source `main` tại `6203bd7` xác nhận đã có đúng migration V22–V24; lỗi do
+  image chưa rebuild từ source mới. Lượt rebuild bên dưới đã validate đủ 24 migration.
+  Không tạo migration giả, repair history, bỏ qua lỗi missing hoặc restore DB để lách guard.
+  Rollback về image cũ V21 sẽ lại thiếu migration cho bước validate.
+- Log/report riêng tư tại
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/video-ai-reset-20261009T050227Z/`.
+  `deploy.log` ghi lượt deploy ban đầu; `resume-20261012.log`,
+  `schema-diagnostic-20261012.log`, `public-smoke-20261012.log` ghi kiểm tra lại.
+  Không đăng nhập cloud, không gọi AI chat/completion, không ghi tiến độ học/upload.
+  Đăng nhập vẫn cần HTTPS qua proxy hiện có vì cookie Secure; không hạ bảo mật cookie.
+
+### Bản main mới nhất + thay đổi local — 12/10/2026
+
+- Image **đang chạy**: `edulab-khtn8:main-6203bd7-20261012T034434Z`, container `edulab`.
+  Build từ `main`/`origin/main` commit `6203bd7` cùng thay đổi local đã giữ sau pull,
+  bao gồm reset composer video AI ngay khi gửi. `.env` ghim cùng image cho `app` và
+  `migrate`; `edulab-khtn8:latest` cũng trỏ image này.
+- Kiểm tra image: 142 resources/JSP khớp byte với source; đủ 24 migration khớp giữa
+  source, WAR và runtime job. Validate cloud đạt trước recreate; job Compose `migrate`
+  cũng exit 0, `up --wait` đạt. Không áp dụng migration; schema giữ nguyên V24,
+  `EDULAB_MIGRATE_ON_DEPLOY=false`, Spring Flyway tắt. Không repair/clean/baseline/import.
+- Docker `healthy`, health `UP`, restart count 0, JS video AI đang phục vụ khớp source.
+  Giữ nguyên runtime environment/secrets, user không root, port `127.0.0.1:8088`,
+  volume `edulab_app-storage`, cookie Secure và scan bypass false.
+- Validation source trước build: 214 test Java không DB và WAR build, AI UI/MP4 browser
+  regression đạt; 6 test Compose đạt. Smoke image đang chạy: trang chủ/khóa học/login/
+  register ở desktop 1440 px và mobile 390 px đều HTTP 200, không overflow, không lỗi
+  JavaScript/resource nội bộ; chỉ GET, không login hoặc gọi AI chat/completion.
+- Image trước `edulab-khtn8:video-ai-reset-20261009T050227Z` được giữ để khôi phục
+  ứng dụng khẩn cấp nếu cần; không đổi schema/storage. Image này thiếu V22–V24 nên
+  không phải rollback đã được validate với cloud hiện tại, không dùng để lách guard.
+  Không `down -v`, không restore DB chỉ để rollback ứng dụng.
+- Logs/report riêng tư:
+  `/Users/ngttu/Workspace/project_asm_prj/.tools/deployments/main-6203bd7-20261012T034434Z/`.
+  Giữ secrets trong `.env.remote` riêng tư; không nằm trong Docker image/build context.
+  Đăng nhập live, model vision thật, upload và các thao tác ghi cloud chưa smoke trong
+  lượt này. HTTPS tiếp tục qua proxy hiện có, không thêm domain/proxy mới.
+
 ### Bản assessment — 14/10/2026
 
 - Container `edulab` hiện chạy `edulab-khtn8:assessment-v25-20261014`, Compose pin

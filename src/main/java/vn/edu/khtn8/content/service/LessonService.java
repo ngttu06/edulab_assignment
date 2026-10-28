@@ -37,4 +37,12 @@ public class LessonService {
         detail(studentId, lessonId);
         lessons.upsertProgress(studentId, lessonId, request.status(), request.completionPercent());
     }
+
+    public CourseStructure courseStructure(long studentId, long courseId) {
+        return lessons.courseStructure(studentId, courseId);
+    }
+
+    public LessonNavigation lessonNavigation(long studentId, long courseId, long lessonId) {
+        return lessons.lessonNavigation(studentId, courseId, lessonId);
+    }
 }

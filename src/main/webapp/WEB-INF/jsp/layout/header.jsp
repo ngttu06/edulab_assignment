@@ -12,15 +12,21 @@
         <button type="submit" class="icon-button" aria-label="Tìm kiếm"><ui:icon name="search"/></button>
     </form>
     <nav class="header-shortcuts" aria-label="Truy cập nhanh">
-        <a data-nav href="${pageContext.request.contextPath}/" aria-label="Trang chủ" title="Trang chủ"><ui:icon name="home"/></a>
-        <a data-nav href="${pageContext.request.contextPath}/courses" aria-label="Khóa học" title="Khóa học"><ui:icon name="cap"/></a>
-        <a data-nav href="${pageContext.request.contextPath}/lessons" aria-label="Bài học" title="Bài học"><ui:icon name="book"/></a>
-        <a data-nav href="${pageContext.request.contextPath}/quizzes" aria-label="Luyện tập" title="Luyện tập"><ui:icon name="quiz"/></a>
-        <a data-nav href="${pageContext.request.contextPath}/community" aria-label="Cộng đồng" title="Cộng đồng"><ui:icon name="users"/></a>
+        <a data-nav href="${pageContext.request.contextPath}/" aria-label="Trang chủ" title="Trang chủ"><ui:icon name="home"/><span class="shortcut-label">Trang chủ</span></a>
+        <a data-nav href="${pageContext.request.contextPath}/courses" aria-label="Khóa học" title="Khóa học"><ui:icon name="cap"/><span class="shortcut-label">Khóa học</span></a>
+        <a data-nav href="${pageContext.request.contextPath}/lessons" aria-label="Bài học" title="Bài học"><ui:icon name="book"/><span class="shortcut-label">Bài học</span></a>
+        <a data-nav href="${pageContext.request.contextPath}/quizzes" aria-label="Luyện tập" title="Luyện tập"><ui:icon name="quiz"/><span class="shortcut-label">Luyện tập</span></a>
+        <a data-nav href="${pageContext.request.contextPath}/community" aria-label="Cộng đồng" title="Cộng đồng"><ui:icon name="users"/><span class="shortcut-label">Cộng đồng</span></a>
     </nav>
     <div class="header-account">
         <c:choose>
             <c:when test="${not empty pageContext.request.userPrincipal}">
+                <c:choose>
+                    <c:when test="${pageContext.request.isUserInRole('ADMIN')}"><span class="role-badge is-admin">Quản trị</span></c:when>
+                    <c:when test="${pageContext.request.isUserInRole('TEACHER')}"><span class="role-badge is-teacher">Giáo viên</span></c:when>
+                    <c:when test="${pageContext.request.isUserInRole('PARENT')}"><span class="role-badge is-parent">Phụ huynh</span></c:when>
+                    <c:when test="${pageContext.request.isUserInRole('STUDENT')}"><span class="role-badge is-student">Học sinh</span></c:when>
+                </c:choose>
                 <a data-nav class="account-link" href="${pageContext.request.contextPath}/profile" aria-label="Thông tin cá nhân" title="Thông tin cá nhân"><ui:icon name="user"/><span>Tài khoản của tôi</span></a>
                 <form id="logoutForm" method="post" action="${pageContext.request.contextPath}/api/v1/auth/logout">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
